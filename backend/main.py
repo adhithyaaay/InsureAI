@@ -1,0 +1,49 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from schemas import Customer, PredictionResponse
+from predictor import predict_charge
+
+app = FastAPI(
+    title="InsureAI API",
+    description="AI Underwriting & Insurance Charge Prediction API",
+    version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/")
+def home():
+    return {
+        "message": "Welcome to InsureAI API"
+    }
+
+
+@app.post("/predict", response_model=PredictionResponse)
+def predict(customer: Customer):
+
+    prediction = predict_charge(customer)
+
+    if prediction < 8000:
+        risk = "Low"
+        recommendation = "Eligible for Standard Premium"
+
+    elif prediction < 20000:
+        risk = "Medium"
+        recommendation = "Additional document verification recommended"
+
+    else:
+        risk = "High"
+        recommendation = "Manual underwriting review required"
+
+    return PredictionResponse(
+        predicted_charge=prediction,
+        risk_level=risk,
+        recommendation=recommendation
+    )
