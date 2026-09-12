@@ -1,7 +1,40 @@
 from typing import Any, List, Literal, Optional, Union
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
+# ==============================================================================
+# AUTHENTICATION & USER SCHEMAS
+# ==============================================================================
+class UserRegister(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    role: str
+    created_at: Any
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+# ==============================================================================
+# ML PREDICTION SCHEMAS
+# ==============================================================================
 class Customer(BaseModel):
     age: int
     sex: int
@@ -32,6 +65,9 @@ class PredictionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# ==============================================================================
+# DOCUMENT & APPLICATION SCHEMAS
+# ==============================================================================
 class DocumentMetadataCreate(BaseModel):
     document_type: str
     filename: str
