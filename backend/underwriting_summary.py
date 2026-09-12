@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from underwriting_rules import evaluate_all_underwriting_indicators
 
@@ -47,6 +48,40 @@ def calculate_review_priority(
 
     # 4. LOW Priority
     return "LOW"
+
+
+def get_review_priority_reasons(
+    indicators: List[Dict[str, Any]],
+    priority: str,
+    risk_level: Optional[str] = None
+) -> List[str]:
+    """
+    Generates deterministic, explainable reasons justifying the assigned review priority.
+    """
+    reasons: List[str] = []
+    critical_indicators = [i for i in indicators if i.get("severity") == "critical"]
+    warning_indicators = [i for i in indicators if i.get("severity") == "warning"]
+    attention_indicators = [i for i in indicators if i.get("severity") == "attention"]
+
+    if critical_indicators:
+        for ind in critical_indicators:
+            reasons.append(f"Critical flag: {ind.get('title', ind.get('code'))}")
+        return reasons
+
+    if warning_indicators:
+        for ind in warning_indicators:
+            reasons.append(f"Warning: {ind.get('title', ind.get('code'))}")
+        if attention_indicators:
+            for ind in attention_indicators[:2]:
+                reasons.append(f"Notable: {ind.get('title', ind.get('code'))}")
+        return reasons
+
+    if attention_indicators:
+        for ind in attention_indicators:
+            reasons.append(f"Notable factor: {ind.get('title', ind.get('code'))}")
+        return reasons
+
+    return ["All applicant parameters and document verifications within normal thresholds."]
 
 
 def parse_shap_explanation(prediction: Optional[Any]) -> Dict[str, Any]:
@@ -175,9 +210,10 @@ def build_underwriting_summary(
         prediction=prediction,
     )
 
-    # 2. Determine review priority
+    # 2. Determine review priority and reasons
     risk_level = getattr(prediction, "risk_level", None)
     review_priority = calculate_review_priority(indicators, risk_level)
+    priority_reasons = get_review_priority_reasons(indicators, review_priority, risk_level)
 
     # 3. Parse and structure SHAP feature attributions
     shap_summary = parse_shap_explanation(prediction)
@@ -191,17 +227,56 @@ def build_underwriting_summary(
         review_priority=review_priority,
     )
 
-    # 5. Extract document findings recap
-    doc_findings = []
-    for d in documents:
-        doc_findings.append({
-            "id": getattr(d, "id", None),
-            "document_type": getattr(d, "document_type", "Unknown"),
-            "filename": getattr(d, "filename", ""),
-            "status": getattr(d, "status", ""),
-            "extraction_method": getattr(d, "extraction_method", None),
-            "discrepancy_count": getattr(d, "discrepancy_count", 0),
-        })
+    # 5. Extract document findings summary
+    total_docs = len(documents) if documents else 0
+    processed_docs = 0
+    discrepancies = 0
+    verified_fields = 0
+    has_critical = False
+    findings: List[str] = []
+
+    for d in (documents or []):
+        if getattr(d, "status", "") == "PROCESSED":
+            processed_docs += 1
+
+        checks = []
+        if hasattr(d, "consistency_checks_json") and d.consistency_checks_json:
+            try:
+                checks = json.loads(d.consistency_checks_json)
+            except Exception:
+                checks = []
+        elif hasattr(d, "consistency_checks") and d.consistency_checks:
+            checks = d.consistency_checks
+
+        doc_type = getattr(d, "document_type", "Document")
+        for check in checks:
+            chk_status = check.get("status") if isinstance(check, dict) else getattr(check, "status", "")
+            field = check.get("field") if isinstance(check, dict) else getattr(check, "field", "")
+            label = check.get("label") if isinstance(check, dict) else getattr(check, "label", field)
+
+            if chk_status == "MATCH":
+                verified_fields += 1
+            elif chk_status == "MISMATCH":
+                discrepancies += 1
+                if field in ("smoking_disclosure", "smoker"):
+                    has_critical = True
+                    findings.append(f"{doc_type}: Critical mismatch in smoking disclosure.")
+                else:
+                    findings.append(f"{doc_type}: Discrepancy in {label}.")
+
+    if discrepancies == 0 and total_docs > 0:
+        findings.append("All extracted document parameters match self-disclosed applicant information.")
+    elif total_docs == 0:
+        findings.append("No documents uploaded with application submission.")
+
+    document_findings = {
+        "total_documents": total_docs,
+        "processed_documents": processed_docs,
+        "discrepancy_count": discrepancies,
+        "verified_fields_count": verified_fields,
+        "has_critical_discrepancy": has_critical,
+        "findings": findings,
+    }
 
     # 6. Assemble complete response package
     applicant_data = None
@@ -222,9 +297,12 @@ def build_underwriting_summary(
         "recommendation": getattr(prediction, "recommendation", "Pending Evaluation") if prediction else "Pending Evaluation",
         "shap_summary": shap_summary,
         "risk_indicators": indicators,
-        "document_findings": doc_findings,
+        "document_findings": document_findings,
         "review_priority": review_priority,
+        "review_priority_reasons": priority_reasons,
         "requires_human_review": any(i.get("requires_review") for i in indicators) or review_priority in ("HIGH", "CRITICAL"),
+        "summary_narrative": narrative,
         "summary": narrative,
         "human_in_the_loop_disclaimer": "AI-generated intelligence is decision support only. Final underwriting decisions must be made by the authorized underwriter.",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }

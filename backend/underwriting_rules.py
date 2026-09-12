@@ -37,6 +37,7 @@ def evaluate_smoking_indicators(application: Any, documents: List[Any]) -> List[
         indicators.append({
             "code": "CRITICAL_DOCUMENT_DISCREPANCY",
             "severity": "critical",
+            "category": "document",
             "title": "Smoking Disclosure Discrepancy",
             "message": mismatch_details or "The medical document indicates smoking/tobacco use while the application declares non-smoking.",
             "source": "medical_document",
@@ -46,6 +47,7 @@ def evaluate_smoking_indicators(application: Any, documents: List[Any]) -> List[
         indicators.append({
             "code": "SMOKING_DISCLOSED",
             "severity": "attention",
+            "category": "smoking",
             "title": "Disclosed Smoking Status",
             "message": "Applicant disclosed active smoking status (smoker = 1), which significantly increases morbidity risk and predicted premium.",
             "source": "application_disclosure",
@@ -65,6 +67,7 @@ def evaluate_bmi_indicators(application: Any) -> List[Dict[str, Any]]:
         return [{
             "code": "BMI_BELOW_NORMAL",
             "severity": "info",
+            "category": "bmi",
             "title": "BMI Below Standard Range",
             "message": f"Applicant BMI ({bmi:.1f}) is below standard normal range (<18.5).",
             "source": "application_disclosure",
@@ -74,6 +77,7 @@ def evaluate_bmi_indicators(application: Any) -> List[Dict[str, Any]]:
         return [{
             "code": "BMI_NORMAL_RANGE",
             "severity": "info",
+            "category": "bmi",
             "title": "BMI Normal Range",
             "message": f"Applicant BMI ({bmi:.1f}) is within standard healthy parameters (18.5–24.9).",
             "source": "application_disclosure",
@@ -83,6 +87,7 @@ def evaluate_bmi_indicators(application: Any) -> List[Dict[str, Any]]:
         return [{
             "code": "BMI_ABOVE_NORMAL",
             "severity": "attention",
+            "category": "bmi",
             "title": "BMI Above Normal Range",
             "message": f"Applicant BMI ({bmi:.1f}) falls into the overweight category (25.0–29.9).",
             "source": "application_disclosure",
@@ -92,6 +97,7 @@ def evaluate_bmi_indicators(application: Any) -> List[Dict[str, Any]]:
         return [{
             "code": "HIGH_BMI_REVIEW",
             "severity": "warning",
+            "category": "bmi",
             "title": "High BMI Requiring Review",
             "message": f"Applicant BMI ({bmi:.1f}) is in the obese tier (>=30.0), significantly impacting calculated health charges.",
             "source": "application_disclosure",
@@ -109,6 +115,7 @@ def evaluate_age_indicators(application: Any) -> List[Dict[str, Any]]:
         return [{
             "code": "YOUNGER_APPLICANT",
             "severity": "info",
+            "category": "age",
             "title": "Younger Demographic Tier",
             "message": f"Applicant age ({age} yrs) is in the younger demographic tier (18–29).",
             "source": "application_disclosure",
@@ -118,6 +125,7 @@ def evaluate_age_indicators(application: Any) -> List[Dict[str, Any]]:
         return [{
             "code": "STANDARD_AGE_RANGE",
             "severity": "info",
+            "category": "age",
             "title": "Standard Age Range",
             "message": f"Applicant age ({age} yrs) is in the standard underwriting age tier (30–49).",
             "source": "application_disclosure",
@@ -127,6 +135,7 @@ def evaluate_age_indicators(application: Any) -> List[Dict[str, Any]]:
         return [{
             "code": "OLDER_APPLICANT_REVIEW",
             "severity": "attention",
+            "category": "age",
             "title": "Older Demographic Review",
             "message": f"Applicant age ({age} yrs) is in the elevated age tier (50+), where baseline morbidity charges scale upward.",
             "source": "application_disclosure",
@@ -155,6 +164,7 @@ def evaluate_document_consistency_indicators(documents: List[Any]) -> List[Dict[
         indicators.append({
             "code": "DOCUMENT_DISCREPANCY",
             "severity": "warning",
+            "category": "document",
             "title": "Document Verification Discrepancy",
             "message": "; ".join(non_smoking_mismatches),
             "source": "document_verification",
@@ -164,6 +174,7 @@ def evaluate_document_consistency_indicators(documents: List[Any]) -> List[Dict[
         indicators.append({
             "code": "DOCUMENTS_CONSISTENT",
             "severity": "info",
+            "category": "document",
             "title": "Document Disclosures Consistent",
             "message": "All verified documents match applicant declarations without discrepancies.",
             "source": "document_verification",
@@ -193,6 +204,7 @@ def evaluate_missing_info_indicators(
         indicators.append({
             "code": "MISSING_MEDICAL_REPORT",
             "severity": "warning" if is_elevated_risk else "attention",
+            "category": "checklist",
             "title": "Missing Medical Report",
             "message": "No medical examination or health report has been submitted for this policy application.",
             "source": "document_checklist",
@@ -208,6 +220,7 @@ def evaluate_missing_info_indicators(
         indicators.append({
             "code": "MISSING_IDENTITY_DOCUMENT",
             "severity": "warning",
+            "category": "checklist",
             "title": "Missing Identity Document",
             "message": "Neither PAN Card nor Aadhaar Card has been uploaded to substantiate applicant identity.",
             "source": "document_checklist",
@@ -219,6 +232,7 @@ def evaluate_missing_info_indicators(
         indicators.append({
             "code": "MISSING_ML_PREDICTION",
             "severity": "warning",
+            "category": "checklist",
             "title": "ML Prediction Pending",
             "message": "Machine learning risk assessment has not yet been computed for this application.",
             "source": "ml_engine",

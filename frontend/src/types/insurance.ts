@@ -79,8 +79,10 @@ export interface DocumentItem {
 export interface UnderwritingRiskIndicator {
   code: string;
   category: string;
+  title: string;
   severity: "info" | "attention" | "warning" | "critical";
   message: string;
+  source?: string;
   requires_review: boolean;
 }
 
@@ -89,13 +91,14 @@ export interface ShapFactorDetail {
   value: string | number;
   impact: number;
   direction: "increase" | "decrease";
+  description?: string;
 }
 
 export interface ShapSummaryResponse {
   base_charge?: number | null;
   top_positive_factors: ShapFactorDetail[];
   top_negative_factors: ShapFactorDetail[];
-  all_factors: ShapFactorDetail[];
+  all_factors: Array<ShapFactorDetail | Record<string, unknown>>;
 }
 
 export interface DocumentFindingSummary {
@@ -109,13 +112,24 @@ export interface DocumentFindingSummary {
 
 export interface UnderwritingSummaryResponse {
   application_id: number;
-  review_priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  review_priority_reasons: string[];
-  predicted_charge?: number | null;
+  applicant?: {
+    id: number;
+    name?: string | null;
+    email?: string | null;
+  } | null;
   model_version?: string | null;
+  base_charge?: number | null;
+  predicted_charge?: number | null;
+  risk_level?: string;
+  recommendation?: string;
   shap_summary?: ShapSummaryResponse | null;
   document_findings: DocumentFindingSummary;
   risk_indicators: UnderwritingRiskIndicator[];
+  review_priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  review_priority_reasons: string[];
+  requires_human_review?: boolean;
   summary_narrative: string;
+  summary?: string;
+  human_in_the_loop_disclaimer?: string;
   generated_at: string;
 }

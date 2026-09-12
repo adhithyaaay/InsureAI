@@ -158,9 +158,10 @@ class ApplicationResponse(BaseModel):
 class UnderwritingRiskIndicator(BaseModel):
     code: str
     severity: Literal["info", "attention", "warning", "critical"]
+    category: str
     title: str
     message: str
-    source: str
+    source: str = "application"
     requires_review: bool
 
 
@@ -169,22 +170,23 @@ class ShapFactorDetail(BaseModel):
     value: Any
     impact: float
     direction: Literal["increase", "decrease"]
-    description: str
+    description: Optional[str] = None
 
 
 class ShapSummaryResponse(BaseModel):
+    base_charge: Optional[float] = None
     top_positive_factors: List[ShapFactorDetail] = []
     top_negative_factors: List[ShapFactorDetail] = []
     all_factors: List[Dict[str, Any]] = []
 
 
 class DocumentFindingSummary(BaseModel):
-    id: Optional[int] = None
-    document_type: str
-    filename: str
-    status: str
-    extraction_method: Optional[str] = None
+    total_documents: int = 0
+    processed_documents: int = 0
     discrepancy_count: int = 0
+    verified_fields_count: int = 0
+    has_critical_discrepancy: bool = False
+    findings: List[str] = []
 
 
 class UnderwritingSummaryResponse(BaseModel):
@@ -195,12 +197,17 @@ class UnderwritingSummaryResponse(BaseModel):
     predicted_charge: Optional[float] = None
     risk_level: str = "Unknown"
     recommendation: str = "Pending Evaluation"
-    shap_summary: ShapSummaryResponse
+    shap_summary: Optional[ShapSummaryResponse] = None
     risk_indicators: List[UnderwritingRiskIndicator] = []
-    document_findings: List[DocumentFindingSummary] = []
+    document_findings: DocumentFindingSummary
     review_priority: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
-    requires_human_review: bool
+    review_priority_reasons: List[str] = []
+    requires_human_review: bool = True
+    summary_narrative: str
     summary: str
-    human_in_the_loop_disclaimer: str
+    human_in_the_loop_disclaimer: str = (
+        "AI-generated intelligence is decision support only. Final underwriting decisions must be made by the authorized underwriter."
+    )
+    generated_at: str
 
     model_config = ConfigDict(from_attributes=True)

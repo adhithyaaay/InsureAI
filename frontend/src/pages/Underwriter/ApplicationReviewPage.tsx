@@ -935,7 +935,7 @@ export default function ApplicationReviewPage() {
                 <span>Deterministic Underwriting Synthesis</span>
               </div>
               <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                {underwritingSummary.summary_narrative}
+                {underwritingSummary.summary_narrative || underwritingSummary.summary}
               </p>
             </div>
 
@@ -988,7 +988,7 @@ export default function ApplicationReviewPage() {
                             </span>
                           </div>
                           <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded border border-slate-800">
-                            {ind.category}
+                            {ind.category || ind.title}
                           </span>
                         </div>
                         <p className="text-xs text-slate-200 mt-2 font-medium leading-relaxed">
