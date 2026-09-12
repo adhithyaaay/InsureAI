@@ -16,10 +16,19 @@ export interface InsurancePayload {
   region: string;
 }
 
+export interface FeatureImpact {
+  feature: string;
+  value: string | number;
+  impact: number;
+  direction: "increase" | "decrease";
+}
+
 export interface PredictionResult {
   predicted_charge: number;
   risk_level: string;
   recommendation: string;
+  base_charge?: number;
+  explanation?: FeatureImpact[];
 }
 
 export interface FormErrors {

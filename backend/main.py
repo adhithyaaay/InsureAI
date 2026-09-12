@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import Customer, PredictionResponse
-from predictor import predict_charge
+from predictor import predict_charge, predict_and_explain
 
 app = FastAPI(
     title="InsureAI API",
@@ -37,7 +37,7 @@ def home():
 @app.post("/predict", response_model=PredictionResponse)
 def predict(customer: Customer):
 
-    prediction = predict_charge(customer)
+    prediction, explanation, base_charge = predict_and_explain(customer)
 
     if prediction < 8000:
         risk = "Low"
@@ -54,5 +54,7 @@ def predict(customer: Customer):
     return PredictionResponse(
         predicted_charge=prediction,
         risk_level=risk,
-        recommendation=recommendation
+        recommendation=recommendation,
+        base_charge=base_charge,
+        explanation=explanation
     )

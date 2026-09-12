@@ -7,6 +7,10 @@ import {
   Download,
   CheckCircle2,
   FileSpreadsheet,
+  TrendingUp,
+  TrendingDown,
+  Info,
+  BarChart3,
 } from "lucide-react";
 
 import type { InsuranceFormData, PredictionResult } from "@/types/insurance";
@@ -204,6 +208,156 @@ export default function DecisionCard({
             </div>
           </div>
         )}
+
+        {/* SHAP Explainability Breakdown */}
+        <div className="border border-slate-200 rounded-xl p-6 md:col-span-2 bg-white">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6 pb-4 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <BarChart3 className="text-blue-600" size={22} />
+                <h3 className="text-lg font-bold text-slate-900">
+                  AI Prediction Explanation
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Top risk factors influencing the predicted premium using SHAP (SHapley Additive exPlanations)
+              </p>
+            </div>
+            {prediction.base_charge && (
+              <div className="text-xs bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-slate-600">
+                <span>Baseline Population Average: </span>
+                <strong className="text-slate-900">
+                  ₹ {Math.round(prediction.base_charge).toLocaleString("en-IN")}
+                </strong>
+              </div>
+            )}
+          </div>
+
+          {prediction.explanation && prediction.explanation.length > 0 ? (
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Factors Increasing Premium */}
+                <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-rose-800 text-xs font-bold uppercase tracking-wider mb-2.5">
+                    <TrendingUp size={16} className="text-rose-600" />
+                    Factors Increasing Premium (+)
+                  </div>
+                  <div className="space-y-2">
+                    {prediction.explanation
+                      .filter((item) => item.direction === "increase")
+                      .map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-xs">
+                          <span className="font-medium text-slate-700 truncate pr-2">
+                            {item.feature} ({item.value})
+                          </span>
+                          <span className="font-bold text-rose-700 shrink-0">
+                            + ₹ {Math.round(item.impact).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      ))}
+                    {prediction.explanation.filter((item) => item.direction === "increase").length === 0 && (
+                      <p className="text-xs text-slate-400 italic">No significant risk escalations.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Factors Decreasing Premium */}
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-emerald-800 text-xs font-bold uppercase tracking-wider mb-2.5">
+                    <TrendingDown size={16} className="text-emerald-600" />
+                    Factors Decreasing Premium (-)
+                  </div>
+                  <div className="space-y-2">
+                    {prediction.explanation
+                      .filter((item) => item.direction === "decrease")
+                      .map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-xs">
+                          <span className="font-medium text-slate-700 truncate pr-2">
+                            {item.feature} ({item.value})
+                          </span>
+                          <span className="font-bold text-emerald-700 shrink-0">
+                            - ₹ {Math.round(item.impact).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      ))}
+                    {prediction.explanation.filter((item) => item.direction === "decrease").length === 0 && (
+                      <p className="text-xs text-slate-400 italic">No significant premium discounts.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Complete Factor Contribution Table with Visual Impact Bars */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Detailed Factor Impact Breakdown
+                  </h4>
+                  <span className="text-[11px] text-slate-400">
+                    Sorted by impact magnitude
+                  </span>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 text-xs font-semibold text-slate-600 grid grid-cols-12 gap-2">
+                    <span className="col-span-5">Feature</span>
+                    <span className="col-span-3">Value</span>
+                    <span className="col-span-2 text-right">Impact</span>
+                    <span className="col-span-2 text-center">Direction</span>
+                  </div>
+                  <div className="divide-y divide-slate-100 bg-white">
+                    {prediction.explanation.map((item, index) => {
+                      const isIncrease = item.direction === "increase";
+                      const maxImpact = Math.max(...prediction.explanation!.map((f) => f.impact), 1);
+                      const barWidth = Math.max(Math.round((item.impact / maxImpact) * 100), 6);
+                      return (
+                        <div key={index} className="px-4 py-3 text-xs grid grid-cols-12 gap-2 items-center hover:bg-slate-50/50 transition">
+                          <div className="col-span-5">
+                            <p className="font-semibold text-slate-800">{item.feature}</p>
+                            <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${isIncrease ? "bg-rose-500" : "bg-emerald-500"}`}
+                                style={{ width: `${barWidth}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="col-span-3 text-slate-600 truncate font-medium">
+                            {String(item.value)}
+                          </div>
+                          <div className={`col-span-2 text-right font-bold ${isIncrease ? "text-rose-700" : "text-emerald-700"}`}>
+                            {isIncrease ? "+" : "-"} ₹ {Math.round(item.impact).toLocaleString("en-IN")}
+                          </div>
+                          <div className="col-span-2 text-center">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                isIncrease
+                                  ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                  : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                              }`}
+                            >
+                              {isIncrease ? "Increase" : "Decrease"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 text-[11px] text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <Info size={14} className="text-blue-600 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Model Explainability:</strong> SHAP values calculate the exact additive contribution of each factor pushing the prediction away from the population expected baseline. They represent true mathematical attribution, not confidence probability.
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6 text-slate-400 text-xs italic">
+              Explainability metrics not available for this prediction response.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Actions */}
