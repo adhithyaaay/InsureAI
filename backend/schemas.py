@@ -147,5 +147,60 @@ class ApplicationResponse(BaseModel):
     predictions: List[PredictionResponse] = []
     documents: List[DocumentMetadataResponse] = []
     decisions: List[UnderwriterDecisionResponse] = []
+    review_priority: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==============================================================================
+# UNDERWRITING INTELLIGENCE & DECISION SUPPORT SCHEMAS (Phase 8)
+# ==============================================================================
+class UnderwritingRiskIndicator(BaseModel):
+    code: str
+    severity: Literal["info", "attention", "warning", "critical"]
+    title: str
+    message: str
+    source: str
+    requires_review: bool
+
+
+class ShapFactorDetail(BaseModel):
+    feature: str
+    value: Any
+    impact: float
+    direction: Literal["increase", "decrease"]
+    description: str
+
+
+class ShapSummaryResponse(BaseModel):
+    top_positive_factors: List[ShapFactorDetail] = []
+    top_negative_factors: List[ShapFactorDetail] = []
+    all_factors: List[Dict[str, Any]] = []
+
+
+class DocumentFindingSummary(BaseModel):
+    id: Optional[int] = None
+    document_type: str
+    filename: str
+    status: str
+    extraction_method: Optional[str] = None
+    discrepancy_count: int = 0
+
+
+class UnderwritingSummaryResponse(BaseModel):
+    application_id: int
+    applicant: Optional[Dict[str, Any]] = None
+    model_version: str = "2.0"
+    base_charge: Optional[float] = None
+    predicted_charge: Optional[float] = None
+    risk_level: str = "Unknown"
+    recommendation: str = "Pending Evaluation"
+    shap_summary: ShapSummaryResponse
+    risk_indicators: List[UnderwritingRiskIndicator] = []
+    document_findings: List[DocumentFindingSummary] = []
+    review_priority: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    requires_human_review: bool
+    summary: str
+    human_in_the_loop_disclaimer: str
 
     model_config = ConfigDict(from_attributes=True)

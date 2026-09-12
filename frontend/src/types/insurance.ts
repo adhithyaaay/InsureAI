@@ -75,3 +75,47 @@ export interface DocumentItem {
   discrepancy_count?: number;
   uploaded_at: string;
 }
+
+export interface UnderwritingRiskIndicator {
+  code: string;
+  category: string;
+  severity: "info" | "attention" | "warning" | "critical";
+  message: string;
+  requires_review: boolean;
+}
+
+export interface ShapFactorDetail {
+  feature: string;
+  value: string | number;
+  impact: number;
+  direction: "increase" | "decrease";
+}
+
+export interface ShapSummaryResponse {
+  base_charge?: number | null;
+  top_positive_factors: ShapFactorDetail[];
+  top_negative_factors: ShapFactorDetail[];
+  all_factors: ShapFactorDetail[];
+}
+
+export interface DocumentFindingSummary {
+  total_documents: number;
+  processed_documents: number;
+  discrepancy_count: number;
+  verified_fields_count: number;
+  has_critical_discrepancy: boolean;
+  findings: string[];
+}
+
+export interface UnderwritingSummaryResponse {
+  application_id: number;
+  review_priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  review_priority_reasons: string[];
+  predicted_charge?: number | null;
+  model_version?: string | null;
+  shap_summary?: ShapSummaryResponse | null;
+  document_findings: DocumentFindingSummary;
+  risk_indicators: UnderwritingRiskIndicator[];
+  summary_narrative: string;
+  generated_at: string;
+}

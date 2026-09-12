@@ -22,8 +22,10 @@ import {
   ChevronUp,
   FileCheck,
   FileSearch,
+  ShieldAlert,
 } from "lucide-react";
 import api from "../../services/api";
+import type { UnderwritingSummaryResponse } from "../../types/insurance";
 
 interface FeatureImpact {
   feature: string;
@@ -103,6 +105,7 @@ export default function ApplicationReviewPage() {
   const { id } = useParams<{ id: string }>();
 
   const [application, setApplication] = useState<ApplicationDetails | null>(null);
+  const [underwritingSummary, setUnderwritingSummary] = useState<UnderwritingSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,8 +154,22 @@ export default function ApplicationReviewPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get<ApplicationDetails>(`/applications/${id}`);
-      setApplication(res.data);
+      const [appRes, summaryRes] = await Promise.allSettled([
+        api.get<ApplicationDetails>(`/applications/${id}`),
+        api.get<UnderwritingSummaryResponse>(`/applications/${id}/underwriting-summary`),
+      ]);
+
+      if (appRes.status === "fulfilled") {
+        setApplication(appRes.value.data);
+      } else {
+        throw appRes.reason;
+      }
+
+      if (summaryRes.status === "fulfilled") {
+        setUnderwritingSummary(summaryRes.value.data);
+      } else {
+        setUnderwritingSummary(null);
+      }
     } catch (err: unknown) {
       console.error("Failed to load application review:", err);
       setError("Unable to load application details. Verify ID exists and you are authenticated as an Underwriter.");
@@ -856,6 +873,260 @@ export default function ApplicationReviewPage() {
             </div>
           )}
         </div>
+
+        {/* AI Underwriting Intelligence & Decision Support Card */}
+        {underwritingSummary && (
+          <div className="bg-slate-950/70 border border-purple-500/30 rounded-2xl p-6 shadow-2xl space-y-6">
+            {/* Dossier Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/30 shrink-0">
+                  <ShieldAlert size={24} />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h3 className="text-base sm:text-lg font-bold text-white">
+                      AI Underwriting Intelligence & Decision Support
+                    </h3>
+                    <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full font-bold uppercase">
+                      Rule Engine + TreeSHAP + OCR
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Automated, explainable decision support synthesized from ML predictions, document verification, and underwriting standards.
+                  </p>
+                </div>
+              </div>
+
+              {/* Review Priority Badge */}
+              <div className="flex flex-col sm:items-end gap-1.5 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-medium">Review Urgency:</span>
+                  <span
+                    className={`px-3.5 py-1 rounded-full text-xs font-extrabold border tracking-wide uppercase ${
+                      underwritingSummary.review_priority === "CRITICAL"
+                        ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-lg shadow-rose-500/10"
+                        : underwritingSummary.review_priority === "HIGH"
+                        ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-lg shadow-amber-500/10"
+                        : underwritingSummary.review_priority === "MEDIUM"
+                        ? "bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-lg shadow-sky-500/10"
+                        : "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-lg shadow-emerald-500/10"
+                    }`}
+                  >
+                    Priority: {underwritingSummary.review_priority}
+                  </span>
+                </div>
+                {underwritingSummary.review_priority_reasons && underwritingSummary.review_priority_reasons.length > 0 && (
+                  <div className="flex flex-wrap gap-1 sm:justify-end">
+                    {underwritingSummary.review_priority_reasons.map((reason, idx) => (
+                      <span key={idx} className="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 px-2 py-0.5 rounded">
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Synthesized Review Narrative */}
+            <div className="bg-slate-900/70 border border-slate-800/80 rounded-xl p-4 sm:p-5">
+              <div className="flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-wider mb-2">
+                <Brain size={15} />
+                <span>Deterministic Underwriting Synthesis</span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+                {underwritingSummary.summary_narrative}
+              </p>
+            </div>
+
+            {/* Sub-Grid: Risk Indicators & SHAP/Document Signals */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Column 1: Underwriting Review Indicators (7 cols) */}
+              <div className="lg:col-span-7 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                    <FileText size={15} className="text-blue-400" />
+                    Review Indicators ({underwritingSummary.risk_indicators.length})
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    {underwritingSummary.risk_indicators.filter((i) => i.requires_review).length} require review
+                  </span>
+                </div>
+
+                <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                  {underwritingSummary.risk_indicators.map((ind, idx) => {
+                    const sevStyle =
+                      ind.severity === "critical"
+                        ? "bg-rose-500/10 border-rose-500/40 text-rose-300"
+                        : ind.severity === "warning"
+                        ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                        : ind.severity === "attention"
+                        ? "bg-purple-500/10 border-purple-500/40 text-purple-300"
+                        : "bg-blue-500/10 border-blue-500/30 text-blue-300";
+
+                    const badgeStyle =
+                      ind.severity === "critical"
+                        ? "bg-rose-500/20 text-rose-300 border-rose-500/50"
+                        : ind.severity === "warning"
+                        ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
+                        : ind.severity === "attention"
+                        ? "bg-purple-500/20 text-purple-300 border-purple-500/50"
+                        : "bg-blue-500/20 text-blue-300 border-blue-500/50";
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-3.5 rounded-xl border transition ${sevStyle}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${badgeStyle}`}>
+                              {ind.severity}
+                            </span>
+                            <span className="font-mono text-xs font-semibold text-white">
+                              {ind.code}
+                            </span>
+                          </div>
+                          <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded border border-slate-800">
+                            {ind.category}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-200 mt-2 font-medium leading-relaxed">
+                          {ind.message}
+                        </p>
+                        {ind.requires_review && (
+                          <div className="mt-2 flex items-center gap-1 text-[11px] text-amber-400 font-semibold">
+                            <AlertTriangle size={12} />
+                            <span>Action flag: manual verification required</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Column 2: SHAP Attribution Drivers + Document Findings (5 cols) */}
+              <div className="lg:col-span-5 space-y-4">
+                {/* SHAP Drivers Box */}
+                {underwritingSummary.shap_summary && (
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                        <BarChart3 size={15} className="text-purple-400" />
+                        Key Premium Drivers
+                      </span>
+                      {underwritingSummary.predicted_charge && (
+                        <span className="text-xs font-mono font-bold text-white">
+                          ₹ {Math.round(underwritingSummary.predicted_charge).toLocaleString("en-IN")}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Top Positive Surcharges */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] uppercase font-bold text-rose-400 tracking-wider flex items-center gap-1">
+                        <TrendingUp size={12} /> Surcharge Factors (+)
+                      </span>
+                      {underwritingSummary.shap_summary.top_positive_factors.slice(0, 3).map((f, i) => (
+                        <div key={i} className="flex justify-between items-center text-xs bg-slate-950/40 px-2.5 py-1.5 rounded border border-slate-800/80">
+                          <span className="text-slate-300 font-medium truncate pr-2">
+                            {f.feature} ({f.value})
+                          </span>
+                          <span className="text-rose-400 font-mono font-bold shrink-0">
+                            + ₹ {Math.round(f.impact).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      ))}
+                      {underwritingSummary.shap_summary.top_positive_factors.length === 0 && (
+                        <p className="text-[11px] text-slate-500 italic">No positive cost drivers.</p>
+                      )}
+                    </div>
+
+                    {/* Top Negative Discounts */}
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider flex items-center gap-1">
+                        <TrendingDown size={12} /> Discount Factors (-)
+                      </span>
+                      {underwritingSummary.shap_summary.top_negative_factors.slice(0, 3).map((f, i) => (
+                        <div key={i} className="flex justify-between items-center text-xs bg-slate-950/40 px-2.5 py-1.5 rounded border border-slate-800/80">
+                          <span className="text-slate-300 font-medium truncate pr-2">
+                            {f.feature} ({f.value})
+                          </span>
+                          <span className="text-emerald-400 font-mono font-bold shrink-0">
+                            - ₹ {Math.round(f.impact).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      ))}
+                      {underwritingSummary.shap_summary.top_negative_factors.length === 0 && (
+                        <p className="text-[11px] text-slate-500 italic">No negative discount drivers.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Document Consistency Finding Box */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-2.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                      <FileCheck size={15} className="text-blue-400" />
+                      Document Verification State
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                        underwritingSummary.document_findings.has_critical_discrepancy
+                          ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                          : underwritingSummary.document_findings.discrepancy_count > 0
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                          : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                      }`}
+                    >
+                      {underwritingSummary.document_findings.has_critical_discrepancy
+                        ? "CRITICAL MISMATCH"
+                        : underwritingSummary.document_findings.discrepancy_count > 0
+                        ? `${underwritingSummary.document_findings.discrepancy_count} DISCREPANCY`
+                        : "VERIFIED CONSISTENT"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-slate-950/40 p-2 rounded border border-slate-800/80">
+                      <span className="text-[10px] uppercase text-slate-500 block">Uploaded Docs</span>
+                      <span className="font-bold text-white">{underwritingSummary.document_findings.total_documents}</span>
+                    </div>
+                    <div className="bg-slate-950/40 p-2 rounded border border-slate-800/80">
+                      <span className="text-[10px] uppercase text-slate-500 block">Verified Disclosures</span>
+                      <span className="font-bold text-emerald-400">{underwritingSummary.document_findings.verified_fields_count}</span>
+                    </div>
+                  </div>
+
+                  {underwritingSummary.document_findings.findings.length > 0 && (
+                    <ul className="text-xs text-slate-300 space-y-1 pt-1 list-disc list-inside">
+                      {underwritingSummary.document_findings.findings.map((f, i) => (
+                        <li key={i} className="leading-snug text-slate-300">
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Human-in-the-Loop Explicit Disclaimer */}
+            <div className="flex items-start gap-3 bg-purple-950/20 border border-purple-500/30 rounded-xl p-4 text-xs text-purple-200">
+              <ShieldCheck size={18} className="text-purple-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <strong className="text-white block font-semibold">
+                  Human-in-the-Loop Governance Notice
+                </strong>
+                <p className="text-slate-300 leading-relaxed">
+                  This decision support package assists the underwriter. The final underwriting verdict rests entirely with the underwriter. The system never automatically issues or rejects policies.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Underwriter Decision Panel & Audit History */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

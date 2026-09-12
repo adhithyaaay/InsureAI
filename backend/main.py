@@ -32,6 +32,7 @@ from schemas import (
     ConsistencyCheckItem,
     UnderwriterDecisionCreate,
     UnderwriterDecisionResponse,
+    UnderwritingSummaryResponse,
 )
 from predictor import predict_and_explain
 from document_storage import (
@@ -42,6 +43,8 @@ from document_storage import (
 from document_processor import process_document
 from field_extractor import extract_structured_fields
 from consistency_checker import check_document_consistency
+from underwriting_rules import evaluate_all_underwriting_indicators
+from underwriting_summary import build_underwriting_summary, calculate_review_priority
 
 logger = logging.getLogger("insureai.api")
 logging.basicConfig(level=logging.INFO)
@@ -173,6 +176,18 @@ def serialize_application(app_record: db_models.Application) -> ApplicationRespo
     applicant_name = app_record.user.name if app_record.user else None
     applicant_email = app_record.user.email if app_record.user else None
 
+    # Calculate review priority dynamically
+    latest_pred = app_record.predictions[0] if app_record.predictions else None
+    indicators = evaluate_all_underwriting_indicators(
+        application=app_record,
+        documents=app_record.documents or [],
+        prediction=latest_pred,
+    )
+    priority = calculate_review_priority(
+        indicators=indicators,
+        risk_level=latest_pred.risk_level if latest_pred else None,
+    )
+
     return ApplicationResponse(
         id=app_record.id,
         user_id=app_record.user_id,
@@ -190,6 +205,7 @@ def serialize_application(app_record: db_models.Application) -> ApplicationRespo
         predictions=preds,
         documents=docs,
         decisions=decisions,
+        review_priority=priority,
     )
 
 
@@ -763,3 +779,38 @@ def get_application_decisions(
         .all()
     )
     return [serialize_decision(d) for d in decisions]
+
+
+# ==============================================================================
+# UNDERWRITING INTELLIGENCE & DECISION SUPPORT ENDPOINTS (Phase 8)
+# ==============================================================================
+@app.get(
+    "/applications/{application_id}/underwriting-summary",
+    response_model=UnderwritingSummaryResponse,
+)
+def get_underwriting_summary(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(require_underwriter),
+):
+    """
+    Retrieves the explainable Underwriting Intelligence & Decision Support dossier.
+    Strictly restricted to UNDERWRITER role. Customers receive 403 Forbidden.
+    Calculated dynamically from verified Application, Prediction, and Document records.
+    """
+    application = db.query(db_models.Application).filter(db_models.Application.id == application_id).first()
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application #{application_id} not found."
+        )
+
+    latest_pred = application.predictions[0] if application.predictions else None
+    docs = application.documents or []
+
+    summary_data = build_underwriting_summary(
+        application=application,
+        prediction=latest_pred,
+        documents=docs,
+    )
+    return UnderwritingSummaryResponse(**summary_data)

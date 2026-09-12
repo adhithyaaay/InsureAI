@@ -47,6 +47,7 @@ interface ApplicationItem {
   smoker: number;
   region: string;
   status: string;
+  review_priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | null;
   created_at: string;
   predictions?: PredictionSummary[];
   documents?: DocumentSummary[];
@@ -61,6 +62,7 @@ export default function UnderwriterDashboard() {
   // Search and Filter State
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [riskFilter, setRiskFilter] = useState("ALL");
   const [smokerFilter, setSmokerFilter] = useState("ALL");
 
@@ -120,6 +122,11 @@ export default function UnderwriterDashboard() {
         if (statusFilter === "REVIEW_REQUIRED" && app.status !== "REVIEW_REQUIRED") return false;
       }
 
+      // Priority Filter
+      if (priorityFilter !== "ALL") {
+        if (app.review_priority !== priorityFilter) return false;
+      }
+
       // Risk Filter
       if (riskFilter !== "ALL") {
         const latestPred = app.predictions && app.predictions.length > 0 ? app.predictions[0] : null;
@@ -138,7 +145,7 @@ export default function UnderwriterDashboard() {
 
       return true;
     });
-  }, [applications, searchQuery, statusFilter, riskFilter, smokerFilter]);
+  }, [applications, searchQuery, statusFilter, priorityFilter, riskFilter, smokerFilter]);
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -234,7 +241,7 @@ export default function UnderwriterDashboard() {
 
         {/* Search & Filter Controls */}
         <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 shadow-xl">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {/* Search */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -261,6 +268,21 @@ export default function UnderwriterDashboard() {
                 <option value="REVIEW_REQUIRED">Status: Review Required</option>
                 <option value="APPROVED">Status: Approved</option>
                 <option value="REJECTED">Status: Rejected</option>
+              </select>
+            </div>
+
+            {/* Review Priority Filter */}
+            <div>
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500 text-xs transition cursor-pointer"
+              >
+                <option value="ALL">Priority: All Priorities</option>
+                <option value="CRITICAL">Priority: Critical</option>
+                <option value="HIGH">Priority: High</option>
+                <option value="MEDIUM">Priority: Medium</option>
+                <option value="LOW">Priority: Low</option>
               </select>
             </div>
 
@@ -331,6 +353,7 @@ export default function UnderwriterDashboard() {
                     <th className="px-4 py-3.5">Ref ID</th>
                     <th className="px-4 py-3.5">Applicant</th>
                     <th className="px-4 py-3.5">Profile</th>
+                    <th className="px-4 py-3.5">Review Priority</th>
                     <th className="px-4 py-3.5">Smoker</th>
                     <th className="px-4 py-3.5">Region</th>
                     <th className="px-4 py-3.5">Predicted Premium</th>
@@ -367,6 +390,25 @@ export default function UnderwriterDashboard() {
                           <div className="text-slate-500 text-[11px]">
                             BMI: {app.bmi} • {app.children} dep.
                           </div>
+                        </td>
+                        <td className="px-4 py-4 text-xs">
+                          {app.review_priority ? (
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                app.review_priority === "CRITICAL"
+                                  ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                                  : app.review_priority === "HIGH"
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                                  : app.review_priority === "MEDIUM"
+                                  ? "bg-sky-500/20 text-sky-300 border-sky-500/40"
+                                  : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                              }`}
+                            >
+                              {app.review_priority}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-[11px]">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-4 text-xs font-semibold">
                           {app.smoker === 1 ? (
