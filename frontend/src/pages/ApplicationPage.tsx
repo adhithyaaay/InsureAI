@@ -113,9 +113,52 @@ export default function ApplicationPage() {
         region: formData.region,
       };
 
-      const response = await api.post<PredictionResult>("/predict", payload);
-      setPrediction(response.data);
-      setStep(4);
+      let result: PredictionResult | null = null;
+
+      try {
+        // 1. Create Application record in database
+        const appRes = await api.post<{ id: number }>("/applications", payload);
+        const appId = appRes.data.id;
+
+        // 2. Persist uploaded document metadata
+        const docTypes: { key: string; label: string }[] = [
+          { key: "aadhaar", label: "Aadhaar Card (National ID)" },
+          { key: "pan", label: "PAN Card (Tax ID)" },
+          { key: "medical", label: "Medical History / Records" },
+          { key: "income", label: "Income Statement / Salary Slip" },
+        ];
+
+        for (const dt of docTypes) {
+          const f = files[dt.key];
+          if (f) {
+            try {
+              await api.post(`/applications/${appId}/documents`, {
+                document_type: dt.label,
+                filename: f.name,
+                file_size: f.size,
+              });
+            } catch (docErr) {
+              console.warn("Could not save document metadata:", docErr);
+            }
+          }
+        }
+
+        // 3. Run prediction linked to persisted application
+        const predRes = await api.post<PredictionResult>(`/applications/${appId}/predict`);
+        result = {
+          ...predRes.data,
+          application_id: appId,
+        };
+      } catch (dbErr) {
+        console.warn("Database persistence endpoint fallback to direct /predict:", dbErr);
+        const fallbackRes = await api.post<PredictionResult>("/predict", payload);
+        result = fallbackRes.data;
+      }
+
+      if (result) {
+        setPrediction(result);
+        setStep(4);
+      }
     } catch (err: unknown) {
       console.error("Underwriting Prediction Failed:", err);
       let errorMsg = "Unable to connect to the prediction server. Please verify backend is running on port 8000.";

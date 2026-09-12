@@ -24,6 +24,9 @@ export interface FeatureImpact {
 }
 
 export interface PredictionResult {
+  id?: number;
+  application_id?: number;
+  model_version?: string;
   predicted_charge: number;
   risk_level: string;
   recommendation: string;

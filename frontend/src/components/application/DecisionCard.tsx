@@ -99,9 +99,16 @@ export default function DecisionCard({
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-8 border border-slate-200">
       <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 mb-3">
-          <Brain size={14} />
-          XGBoost Risk Assessment v1.0
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+            <Brain size={14} />
+            XGBoost Risk Assessment v{prediction.model_version || "2.0"}
+          </div>
+          {prediction.application_id && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-300 font-mono">
+              <span>App Ref: #APP-{String(prediction.application_id).padStart(5, "0")}</span>
+            </div>
+          )}
         </div>
         <h1 className="text-3xl font-bold text-slate-900">
           AI Underwriting Decision

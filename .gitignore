@@ -11,6 +11,7 @@ env/
 # Environment variables
 .env
 .env.*
+!.env.example
 
 # Node
 node_modules/
@@ -34,3 +35,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
