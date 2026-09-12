@@ -1,7 +1,9 @@
+import os
 import joblib
 import pandas as pd
 
-saved_data = joblib.load("models/xgboost_model.pkl")
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "xgboost_model.pkl")
+saved_data = joblib.load(MODEL_PATH)
 
 model = saved_data["model"]
 feature_columns = saved_data["columns"]
