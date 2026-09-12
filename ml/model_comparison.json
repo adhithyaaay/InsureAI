@@ -1,0 +1,52 @@
+{
+  "dataset": "dataset/insurance.csv",
+  "samples": 1338,
+  "test_split": 0.2,
+  "random_state": 42,
+  "canonical_features": [
+    "age",
+    "sex",
+    "bmi",
+    "children",
+    "smoker",
+    "region_northeast",
+    "region_northwest",
+    "region_southeast",
+    "region_southwest"
+  ],
+  "champion_model": "XGBoost Regressor",
+  "comparison": [
+    {
+      "model": "Linear Regression",
+      "mae": 4181.19,
+      "rmse": 5796.28,
+      "r2": 0.7836,
+      "cv_r2_mean": 0.7331,
+      "cv_r2_std": 0.0489
+    },
+    {
+      "model": "Random Forest Regressor",
+      "mae": 2559.72,
+      "rmse": 4595.96,
+      "r2": 0.8639,
+      "cv_r2_mean": 0.8282,
+      "cv_r2_std": 0.0402
+    },
+    {
+      "model": "Gradient Boosting Regressor",
+      "mae": 2407.29,
+      "rmse": 4332.1,
+      "r2": 0.8791,
+      "cv_r2_mean": 0.841,
+      "cv_r2_std": 0.0409
+    },
+    {
+      "model": "XGBoost Regressor",
+      "mae": 2404.74,
+      "rmse": 4332.95,
+      "r2": 0.8791,
+      "cv_r2_mean": 0.8327,
+      "cv_r2_std": 0.0431
+    }
+  ]
+}
