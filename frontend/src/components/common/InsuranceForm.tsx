@@ -27,9 +27,9 @@ export default function InsuranceForm({
 }: Props) {
   return (
     <div className="flex justify-center py-10">
-      <Card className="w-full max-w-xl">
+      <Card className="w-full max-w-xl bg-slate-900 border border-slate-800 text-white shadow-xl">
         <CardHeader>
-          <CardTitle className="text-2xl">
+          <CardTitle className="text-2xl text-white">
             Customer Information
           </CardTitle>
         </CardHeader>
@@ -49,7 +49,7 @@ export default function InsuranceForm({
                   age: e.target.value === "" ? "" : Number(e.target.value),
                 })
               }
-              className={errors.age ? "border-red-500 focus-visible:ring-red-500" : ""}
+              className={`bg-slate-950/80 border-slate-700 text-white placeholder:text-slate-500 rounded-xl py-2.5 h-10 ${errors.age ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
             {errors.age && (
               <p className="text-sm text-red-500 mt-1.5">{errors.age}</p>
@@ -101,7 +101,7 @@ export default function InsuranceForm({
                   bmi: e.target.value === "" ? "" : Number(e.target.value),
                 })
               }
-              className={errors.bmi ? "border-red-500 focus-visible:ring-red-500" : ""}
+              className={`bg-slate-950/80 border-slate-700 text-white placeholder:text-slate-500 rounded-xl py-2.5 h-10 ${errors.bmi ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
             {errors.bmi && (
               <p className="text-sm text-red-500 mt-1.5">{errors.bmi}</p>
@@ -124,7 +124,7 @@ export default function InsuranceForm({
                   children: e.target.value === "" ? "" : Number(e.target.value),
                 })
               }
-              className={errors.children ? "border-red-500 focus-visible:ring-red-500" : ""}
+              className={`bg-slate-950/80 border-slate-700 text-white placeholder:text-slate-500 rounded-xl py-2.5 h-10 ${errors.children ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
             {errors.children && (
               <p className="text-sm text-red-500 mt-1.5">{errors.children}</p>

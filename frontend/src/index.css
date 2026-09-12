@@ -2,6 +2,16 @@
 
 @theme {
   --font-sans: "Inter Variable", sans-serif;
+  --color-popover: #1e293b;
+  --color-popover-foreground: #f8fafc;
+  --color-accent: #2563eb;
+  --color-accent-foreground: #ffffff;
+  --color-card: #0f172a;
+  --color-card-foreground: #f8fafc;
+  --color-muted: #1e293b;
+  --color-muted-foreground: #94a3b8;
+  --color-input: #334155;
+  --color-border: #334155;
 }
 
 * {
@@ -16,3 +26,22 @@ body {
   margin: 0;
   font-family: var(--font-sans);
 }
+
+/* Global Select and Option element dark theme contrast */
+select {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+select option {
+  background-color: #1e293b;
+  color: #f8fafc;
+  padding: 8px 12px;
+}
+
+select option:checked,
+select option:hover,
+select option:focus {
+  background-color: #2563eb;
+  color: #ffffff;
+}
