@@ -3,8 +3,9 @@ import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from database import init_db, get_db
@@ -33,6 +34,11 @@ from schemas import (
     UnderwriterDecisionCreate,
     UnderwriterDecisionResponse,
     UnderwritingSummaryResponse,
+    HealthResponse,
+    AnalyticsDashboardResponse,
+    RiskDistributionResponse,
+    MonthlyApplicationItem,
+    PremiumTrendItem,
 )
 from predictor import predict_and_explain
 from document_storage import (
@@ -45,6 +51,9 @@ from field_extractor import extract_structured_fields
 from consistency_checker import check_document_consistency
 from underwriting_rules import evaluate_all_underwriting_indicators
 from underwriting_summary import build_underwriting_summary, calculate_review_priority
+import analytics_service
+from report_generator import generate_underwriting_report_pdf
+
 
 logger = logging.getLogger("insureai.api")
 logging.basicConfig(level=logging.INFO)
@@ -85,6 +94,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ==============================================================================
+# HEALTH & OBSERVABILITY ENDPOINTS (Phase 9)
+# ==============================================================================
+@app.get("/health", response_model=HealthResponse)
+def health_check():
+    """Liveness probe returning operational status."""
+    return HealthResponse(status="ok")
+
+
+@app.get("/health/db", response_model=HealthResponse)
+def health_check_db(db: Session = Depends(get_db)):
+    """Readiness probe checking database connectivity."""
+    try:
+        db.execute(text("SELECT 1"))
+        return HealthResponse(status="ok", database="connected")
+    except Exception as exc:
+        logger.error(f"Database health check failed: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database unreachable: {exc}"
+        )
 
 
 # ==============================================================================
@@ -814,3 +846,97 @@ def get_underwriting_summary(
         documents=docs,
     )
     return UnderwritingSummaryResponse(**summary_data)
+
+
+# ==============================================================================
+# ANALYTICS & UNDERWRITER REPORT ENDPOINTS (Phase 9)
+# ==============================================================================
+@app.get("/analytics/dashboard", response_model=AnalyticsDashboardResponse)
+def get_analytics_dashboard(
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(require_underwriter),
+):
+    """
+    Underwriting operations KPIs backed strictly by real database records.
+    Restricted to UNDERWRITER role.
+    """
+    data = analytics_service.get_analytics_dashboard(db)
+    return AnalyticsDashboardResponse(**data)
+
+
+@app.get("/analytics/risk-distribution", response_model=RiskDistributionResponse)
+def get_risk_distribution(
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(require_underwriter),
+):
+    """
+    Aggregates application risk tiers (Low, Medium, High).
+    Restricted to UNDERWRITER role.
+    """
+    data = analytics_service.get_risk_distribution(db)
+    return RiskDistributionResponse(**data)
+
+
+@app.get("/analytics/monthly", response_model=List[MonthlyApplicationItem])
+def get_monthly_applications(
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(require_underwriter),
+):
+    """
+    Aggregates application volumes by calendar month.
+    Restricted to UNDERWRITER role.
+    """
+    data = analytics_service.get_monthly_applications(db)
+    return [MonthlyApplicationItem(**item) for item in data]
+
+
+@app.get("/analytics/premium-trend", response_model=List[PremiumTrendItem])
+def get_premium_trends(
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(require_underwriter),
+):
+    """
+    Aggregates average predicted insurance premium trends by calendar month.
+    Restricted to UNDERWRITER role.
+    """
+    data = analytics_service.get_premium_trends(db)
+    return [PremiumTrendItem(**item) for item in data]
+
+
+@app.get("/applications/{application_id}/underwriting-report")
+def download_underwriting_report(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(require_underwriter),
+):
+    """
+    Generates and downloads a comprehensive, multi-page PDF Underwriting Assessment Report.
+    Strictly restricted to UNDERWRITER role. Customers receive 403 Forbidden.
+    Non-mutating: does not alter application status or database records.
+    """
+    application = db.query(db_models.Application).filter(db_models.Application.id == application_id).first()
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application #{application_id} not found."
+        )
+
+    latest_pred = application.predictions[0] if application.predictions else None
+    docs = application.documents or []
+    decisions = application.decisions or []
+
+    pdf_bytes = generate_underwriting_report_pdf(
+        application=application,
+        prediction=latest_pred,
+        documents=docs,
+        decisions=decisions,
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="underwriting_report_{application_id}.pdf"',
+            "Content-Type": "application/pdf",
+        },
+    )

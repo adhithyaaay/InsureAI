@@ -23,6 +23,7 @@ import {
   FileCheck,
   FileSearch,
   ShieldAlert,
+  FileDown,
 } from "lucide-react";
 import api from "../../services/api";
 import type { UnderwritingSummaryResponse } from "../../types/insurance";
@@ -217,6 +218,32 @@ export default function ApplicationReviewPage() {
     }
   };
 
+  const [downloadingReport, setDownloadingReport] = useState(false);
+
+  const handleDownloadReport = async () => {
+    if (!id) return;
+    try {
+      setDownloadingReport(true);
+      const response = await api.get(`/applications/${id}/underwriting-report`, {
+        responseType: "blob",
+      });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `underwriting_report_${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download underwriting report:", err);
+      alert("Failed to download underwriting report. Please try again.");
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
+
   const handleRunPrediction = async () => {
     if (!id) return;
     try {
@@ -303,8 +330,17 @@ export default function ApplicationReviewPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+          <div className="flex items-center gap-3 text-xs text-slate-400">
             <span>Submitted: {new Date(application.created_at).toLocaleString()}</span>
+            <button
+              onClick={handleDownloadReport}
+              disabled={downloadingReport}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition shadow-sm disabled:opacity-50"
+              title="Download comprehensive PDF Underwriting Assessment Report"
+            >
+              {downloadingReport ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+              Download Report (PDF)
+            </button>
           </div>
         </div>
       </header>

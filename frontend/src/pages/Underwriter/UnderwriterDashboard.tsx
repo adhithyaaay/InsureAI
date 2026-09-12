@@ -15,6 +15,7 @@ import {
   XCircle,
   Clock,
   ArrowRight,
+  BarChart3,
 } from "lucide-react";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
@@ -170,6 +171,14 @@ export default function UnderwriterDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              to="/underwriter/analytics"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-medium transition"
+            >
+              <BarChart3 size={14} />
+              Analytics Dashboard
+            </Link>
+
             <button
               onClick={fetchApplications}
               disabled={loading}

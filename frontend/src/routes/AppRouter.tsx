@@ -8,6 +8,7 @@ import LoginPage from "../pages/Login/LoginPage";
 import RegisterPage from "../pages/Register/RegisterPage";
 import UnderwriterDashboard from "../pages/Underwriter/UnderwriterDashboard";
 import ApplicationReviewPage from "../pages/Underwriter/ApplicationReviewPage";
+import AnalyticsDashboard from "../pages/Underwriter/AnalyticsDashboard";
 import UnauthorizedPage from "../pages/UnauthorizedPage";
 
 export default function AppRouter() {
@@ -37,6 +38,14 @@ export default function AppRouter() {
             element={
               <ProtectedRoute allowedRoles={["UNDERWRITER"]}>
                 <UnderwriterDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/underwriter/analytics"
+            element={
+              <ProtectedRoute allowedRoles={["UNDERWRITER"]}>
+                <AnalyticsDashboard />
               </ProtectedRoute>
             }
           />

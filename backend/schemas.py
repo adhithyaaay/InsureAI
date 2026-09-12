@@ -211,3 +211,38 @@ class UnderwritingSummaryResponse(BaseModel):
     generated_at: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ==============================================================================
+# ANALYTICS & HEALTH SCHEMAS (Phase 9)
+# ==============================================================================
+class HealthResponse(BaseModel):
+    status: str = "ok"
+    database: Optional[str] = None
+
+
+class AnalyticsDashboardResponse(BaseModel):
+    total_applications: int
+    pending_applications: int
+    approved_applications: int
+    rejected_applications: int
+    review_required_applications: int
+    approval_rate: float
+    average_predicted_premium: float
+    critical_priority_applications: int
+
+
+class RiskDistributionResponse(BaseModel):
+    low: int
+    medium: int
+    high: int
+
+
+class MonthlyApplicationItem(BaseModel):
+    month: str
+    applications: int
+
+
+class PremiumTrendItem(BaseModel):
+    month: str
+    average_premium: float
