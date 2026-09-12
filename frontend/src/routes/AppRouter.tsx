@@ -7,6 +7,7 @@ import ApplicationPage from "../pages/ApplicationPage";
 import LoginPage from "../pages/Login/LoginPage";
 import RegisterPage from "../pages/Register/RegisterPage";
 import UnderwriterDashboard from "../pages/Underwriter/UnderwriterDashboard";
+import ApplicationReviewPage from "../pages/Underwriter/ApplicationReviewPage";
 import UnauthorizedPage from "../pages/UnauthorizedPage";
 
 export default function AppRouter() {
@@ -30,12 +31,20 @@ export default function AppRouter() {
             }
           />
 
-          {/* Protected Underwriter Route */}
+          {/* Protected Underwriter Routes */}
           <Route
             path="/underwriter"
             element={
               <ProtectedRoute allowedRoles={["UNDERWRITER"]}>
                 <UnderwriterDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/underwriter/applications/:id"
+            element={
+              <ProtectedRoute allowedRoles={["UNDERWRITER"]}>
+                <ApplicationReviewPage />
               </ProtectedRoute>
             }
           />

@@ -96,24 +96,6 @@ class ApplicationCreate(BaseModel):
     user_id: Optional[int] = None
 
 
-class ApplicationResponse(BaseModel):
-    id: int
-    user_id: Optional[int] = None
-    age: int
-    sex: int
-    bmi: float
-    children: int
-    smoker: int
-    region: str
-    status: str = "PENDING_REVIEW"
-    created_at: Any
-    updated_at: Any
-    predictions: List[PredictionResponse] = []
-    documents: List[DocumentMetadataResponse] = []
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class UnderwriterDecisionCreate(BaseModel):
     decision: str
     notes: Optional[str] = None
@@ -126,6 +108,28 @@ class UnderwriterDecisionResponse(BaseModel):
     decision: str
     notes: Optional[str] = None
     underwriter_id: Optional[int] = None
+    underwriter_name: Optional[str] = None
     created_at: Any
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ApplicationResponse(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    applicant_name: Optional[str] = None
+    applicant_email: Optional[str] = None
+    age: int
+    sex: int
+    bmi: float
+    children: int
+    smoker: int
+    region: str
+    status: str = "PENDING_REVIEW"
+    created_at: Any
+    updated_at: Any
+    predictions: List[PredictionResponse] = []
+    documents: List[DocumentMetadataResponse] = []
+    decisions: List[UnderwriterDecisionResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

@@ -51,7 +51,7 @@ class Application(Base):
     user = relationship("User", back_populates="applications")
     predictions = relationship("Prediction", back_populates="application", cascade="all, delete-orphan", order_by="desc(Prediction.created_at)")
     documents = relationship("Document", back_populates="application", cascade="all, delete-orphan", order_by="desc(Document.uploaded_at)")
-    decisions = relationship("UnderwriterDecision", back_populates="application", cascade="all, delete-orphan", order_by="desc(UnderwriterDecision.created_at)")
+    decisions = relationship("UnderwriterDecision", back_populates="application", cascade="all, delete-orphan", order_by="desc(UnderwriterDecision.id)")
 
 
 class Prediction(Base):
@@ -118,3 +118,4 @@ class UnderwriterDecision(Base):
 
     # Relationships
     application = relationship("Application", back_populates="decisions")
+    underwriter = relationship("User", foreign_keys=[underwriter_id])

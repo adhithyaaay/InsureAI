@@ -109,6 +109,19 @@ def serialize_prediction(pred: db_models.Prediction) -> PredictionResponse:
     )
 
 
+def serialize_decision(d: db_models.UnderwriterDecision) -> UnderwriterDecisionResponse:
+    underwriter_name = d.underwriter.name if (hasattr(d, "underwriter") and d.underwriter) else None
+    return UnderwriterDecisionResponse(
+        id=d.id,
+        application_id=d.application_id,
+        decision=d.decision,
+        notes=d.notes,
+        underwriter_id=d.underwriter_id,
+        underwriter_name=underwriter_name,
+        created_at=d.created_at.isoformat() if d.created_at else None,
+    )
+
+
 def serialize_application(app_record: db_models.Application) -> ApplicationResponse:
     preds = [serialize_prediction(p) for p in (app_record.predictions or [])]
     docs = [
@@ -123,9 +136,15 @@ def serialize_application(app_record: db_models.Application) -> ApplicationRespo
         )
         for d in (app_record.documents or [])
     ]
+    decisions = [serialize_decision(dec) for dec in (app_record.decisions or [])]
+    applicant_name = app_record.user.name if app_record.user else None
+    applicant_email = app_record.user.email if app_record.user else None
+
     return ApplicationResponse(
         id=app_record.id,
         user_id=app_record.user_id,
+        applicant_name=applicant_name,
+        applicant_email=applicant_email,
         age=app_record.age,
         sex=app_record.sex,
         bmi=app_record.bmi,
@@ -137,6 +156,7 @@ def serialize_application(app_record: db_models.Application) -> ApplicationRespo
         updated_at=app_record.updated_at.isoformat() if app_record.updated_at else None,
         predictions=preds,
         documents=docs,
+        decisions=decisions,
     )
 
 
@@ -524,21 +544,49 @@ def record_underwriter_decision(
     db.add(decision_record)
 
     # Update application status
-    if decision_in.decision.upper() in ["APPROVE", "APPROVED"]:
+    dec_upper = decision_in.decision.upper().strip()
+    if dec_upper in ["APPROVE", "APPROVED"]:
         application.status = "APPROVED"
-    elif decision_in.decision.upper() in ["REJECT", "REJECTED"]:
+    elif dec_upper in ["REJECT", "REJECTED"]:
         application.status = "REJECTED"
-    elif decision_in.decision.upper() in ["REQUEST_INFO", "REFERRED"]:
-        application.status = "REFERRED"
+    elif dec_upper in ["REQUEST_REVIEW", "REQUEST REVIEW", "REQUEST_INFO", "REFERRED"]:
+        application.status = "REVIEW_REQUIRED"
+    else:
+        application.status = dec_upper
 
     db.commit()
     db.refresh(decision_record)
 
-    return UnderwriterDecisionResponse(
-        id=decision_record.id,
-        application_id=decision_record.application_id,
-        decision=decision_record.decision,
-        notes=decision_record.notes,
-        underwriter_id=decision_record.underwriter_id,
-        created_at=decision_record.created_at.isoformat() if decision_record.created_at else None,
+    return serialize_decision(decision_record)
+
+
+@app.get("/applications/{application_id}/decisions", response_model=List[UnderwriterDecisionResponse])
+def get_application_decisions(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user),
+):
+    """
+    Retrieves the decision audit history for an application.
+    Enforces ownership: Only owner or underwriter can view decisions.
+    """
+    application = db.query(db_models.Application).filter(db_models.Application.id == application_id).first()
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application #{application_id} not found."
+        )
+
+    if current_user.role.upper() != "UNDERWRITER" and application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: You do not have permission to view decisions for this application."
+        )
+
+    decisions = (
+        db.query(db_models.UnderwriterDecision)
+        .filter(db_models.UnderwriterDecision.application_id == application_id)
+        .order_by(db_models.UnderwriterDecision.id.desc())
+        .all()
     )
+    return [serialize_decision(d) for d in decisions]
