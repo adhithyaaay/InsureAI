@@ -2,7 +2,8 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -28,10 +29,19 @@ from schemas import (
     ApplicationResponse,
     DocumentMetadataCreate,
     DocumentMetadataResponse,
+    ConsistencyCheckItem,
     UnderwriterDecisionCreate,
     UnderwriterDecisionResponse,
 )
 from predictor import predict_and_explain
+from document_storage import (
+    validate_file_security,
+    save_uploaded_document,
+    get_safe_document_path,
+)
+from document_processor import process_document
+from field_extractor import extract_structured_fields
+from consistency_checker import check_document_consistency
 
 logger = logging.getLogger("insureai.api")
 logging.basicConfig(level=logging.INFO)
@@ -122,20 +132,43 @@ def serialize_decision(d: db_models.UnderwriterDecision) -> UnderwriterDecisionR
     )
 
 
+def serialize_document(d: db_models.Document) -> DocumentMetadataResponse:
+    structured_data = None
+    if d.structured_data_json:
+        try:
+            structured_data = json.loads(d.structured_data_json)
+        except Exception:
+            structured_data = None
+
+    checks = []
+    if d.consistency_checks_json:
+        try:
+            raw_checks = json.loads(d.consistency_checks_json)
+            checks = [ConsistencyCheckItem(**c) for c in raw_checks]
+        except Exception:
+            checks = []
+
+    return DocumentMetadataResponse(
+        id=d.id,
+        application_id=d.application_id,
+        document_type=d.document_type,
+        filename=d.filename,
+        file_size=d.file_size,
+        storage_path=d.storage_path,
+        mime_type=d.mime_type,
+        status=d.status,
+        extraction_method=d.extraction_method,
+        extracted_text=d.extracted_text,
+        structured_data=structured_data,
+        consistency_checks=checks,
+        discrepancy_count=d.discrepancy_count or 0,
+        uploaded_at=d.uploaded_at.isoformat() if d.uploaded_at else None,
+    )
+
+
 def serialize_application(app_record: db_models.Application) -> ApplicationResponse:
     preds = [serialize_prediction(p) for p in (app_record.predictions or [])]
-    docs = [
-        DocumentMetadataResponse(
-            id=d.id,
-            application_id=d.application_id,
-            document_type=d.document_type,
-            filename=d.filename,
-            file_size=d.file_size,
-            status=d.status,
-            uploaded_at=d.uploaded_at.isoformat() if d.uploaded_at else None,
-        )
-        for d in (app_record.documents or [])
-    ]
+    docs = [serialize_document(d) for d in (app_record.documents or [])]
     decisions = [serialize_decision(dec) for dec in (app_record.decisions or [])]
     applicant_name = app_record.user.name if app_record.user else None
     applicant_email = app_record.user.email if app_record.user else None
@@ -469,14 +502,154 @@ def add_document_metadata(
     db.commit()
     db.refresh(document)
 
-    return DocumentMetadataResponse(
-        id=document.id,
-        application_id=document.application_id,
-        document_type=document.document_type,
+    return serialize_document(document)
+
+
+@app.post(
+    "/applications/{application_id}/documents/upload",
+    response_model=DocumentMetadataResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_application_document(
+    application_id: int,
+    file: UploadFile = File(...),
+    document_type: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user),
+):
+    """
+    Handles secure multipart file upload, storage, OCR text extraction,
+    structured entity extraction, and application consistency verification.
+    """
+    application = db.query(db_models.Application).filter(db_models.Application.id == application_id).first()
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application #{application_id} not found."
+        )
+
+    if current_user.role.upper() != "UNDERWRITER" and application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: You do not have permission to upload documents for this application."
+        )
+
+    file_bytes = await file.read()
+
+    # 1. Multi-layer file security validation
+    is_valid, detected_mime, err = validate_file_security(
+        file_bytes=file_bytes,
+        original_filename=file.filename or "uploaded_document",
+        client_content_type=file.content_type,
+    )
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err,
+        )
+
+    # 2. Save document locally with path traversal protection
+    rel_path, safe_id, file_size = save_uploaded_document(
+        application_id=application.id,
+        file_bytes=file_bytes,
+        original_filename=file.filename or "uploaded_document",
+        detected_mime=detected_mime,
+    )
+    abs_path = get_safe_document_path(rel_path)
+    if not abs_path:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resolve stored document file path.",
+        )
+
+    # 3. Text Extraction / OCR Pipeline
+    extracted_text, method, success, note = process_document(abs_path, detected_mime)
+
+    # 4. Structured Entity Extraction
+    structured_fields = extract_structured_fields(extracted_text, document_type)
+
+    # 5. Consistency Checking against Application Disclosures
+    applicant_name = application.user.name if application.user else None
+    checks, disc_count, summary = check_document_consistency(
+        extracted_fields=structured_fields,
+        application=application,
+        applicant_name=applicant_name,
+    )
+
+    doc_status = "PROCESSED" if success else ("UPLOADED_PENDING_REVIEW" if "NEEDS_TESSERACT" in method else "FAILED_EXTRACTION")
+
+    document = db_models.Document(
+        application_id=application.id,
+        document_type=document_type,
+        filename=file.filename or safe_id,
+        file_size=file_size,
+        storage_path=rel_path,
+        mime_type=detected_mime,
+        status=doc_status,
+        extracted_text=extracted_text if extracted_text else (note or ""),
+        extraction_method=method,
+        structured_data_json=json.dumps(structured_fields),
+        consistency_checks_json=json.dumps(checks),
+        discrepancy_count=disc_count,
+    )
+    db.add(document)
+    db.commit()
+    db.refresh(document)
+
+    return serialize_document(document)
+
+
+@app.get("/applications/{application_id}/documents/{document_id}/file")
+def get_document_file(
+    application_id: int,
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user),
+):
+    """
+    Streams the stored document file safely with MIME type headers.
+    Restricted to the application owner and underwriters.
+    """
+    application = db.query(db_models.Application).filter(db_models.Application.id == application_id).first()
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application #{application_id} not found."
+        )
+
+    if current_user.role.upper() != "UNDERWRITER" and application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: You do not have permission to access files for this application."
+        )
+
+    document = db.query(db_models.Document).filter(
+        db_models.Document.id == document_id,
+        db_models.Document.application_id == application_id,
+    ).first()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document #{document_id} not found for Application #{application_id}."
+        )
+
+    if not document.storage_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This document has no stored file on disk.",
+        )
+
+    safe_path = get_safe_document_path(document.storage_path)
+    if not safe_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document file was not found on disk or failed security validation.",
+        )
+
+    return FileResponse(
+        path=safe_path,
+        media_type=document.mime_type or "application/octet-stream",
         filename=document.filename,
-        file_size=document.file_size,
-        status=document.status,
-        uploaded_at=document.uploaded_at.isoformat() if document.uploaded_at else None,
     )
 
 

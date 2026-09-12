@@ -70,10 +70,10 @@ export default function DocumentUploader({ files, setFiles }: Props) {
         <p className="text-center text-gray-500">
           Upload applicant verification documents for underwriter review.
         </p>
-        <div className="mt-2 flex items-center justify-center gap-2 text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-lg p-2.5 max-w-xl mx-auto">
-          <AlertCircle size={16} className="shrink-0 text-amber-600" />
+        <div className="mt-2 flex items-center justify-center gap-2 text-xs bg-blue-50 text-blue-800 border border-blue-200 rounded-lg p-2.5 max-w-xl mx-auto">
+          <AlertCircle size={16} className="shrink-0 text-blue-600" />
           <span>
-            <strong>Note:</strong> Automated OCR & document verification pipeline is a placeholder in this phase. Uploaded files are tagged as <em>Uploaded (Pending Review)</em>.
+            <strong>Document Intelligence:</strong> Uploaded documents (PDF, PNG, JPG up to 10MB) are parsed via text extraction and local OCR to cross-check application disclosures during underwriter review.
           </span>
         </div>
       </CardHeader>

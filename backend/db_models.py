@@ -93,7 +93,16 @@ class Document(Base):
     document_type = Column(String(100), nullable=False)  # e.g., Aadhaar, PAN, Medical, Income
     filename = Column(String(255), nullable=False)
     file_size = Column(Integer, nullable=True)
+    storage_path = Column(String(500), nullable=True)
+    mime_type = Column(String(100), nullable=True)
     status = Column(String(50), default="UPLOADED_PENDING_REVIEW", nullable=False)
+
+    # Document Intelligence & OCR outputs
+    extracted_text = Column(Text, nullable=True)
+    extraction_method = Column(String(50), nullable=True)  # EMBEDDED_PDF_TEXT, TESSERACT_OCR_*, etc.
+    structured_data_json = Column(Text, nullable=True)
+    consistency_checks_json = Column(Text, nullable=True)
+    discrepancy_count = Column(Integer, default=0, nullable=False)
 
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

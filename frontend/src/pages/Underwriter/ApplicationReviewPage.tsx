@@ -17,6 +17,11 @@ import {
   AlertCircle,
   BarChart3,
   ShieldCheck,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  FileCheck,
+  FileSearch,
 } from "lucide-react";
 import api from "../../services/api";
 
@@ -39,13 +44,29 @@ interface PredictionItem {
   created_at?: string;
 }
 
+interface ConsistencyCheckItem {
+  field: string;
+  label: string;
+  application_value: string | number | null | undefined;
+  document_value: string | number | null | undefined;
+  status: "MATCH" | "MISMATCH" | "NOT_FOUND";
+  details: string;
+}
+
 interface DocumentItem {
   id: number;
   application_id: number;
   document_type: string;
   filename: string;
   file_size?: number | null;
+  storage_path?: string | null;
+  mime_type?: string | null;
   status: string;
+  extraction_method?: string | null;
+  extracted_text?: string | null;
+  structured_data?: Record<string, unknown> | null;
+  consistency_checks?: ConsistencyCheckItem[];
+  discrepancy_count?: number;
   uploaded_at: string;
 }
 
@@ -94,6 +115,36 @@ export default function ApplicationReviewPage() {
 
   // Trigger evaluation state
   const [evaluating, setEvaluating] = useState(false);
+
+  // Document intelligence expansion & streaming state
+  const [expandedDocText, setExpandedDocText] = useState<Record<number, boolean>>({});
+  const [fileLoadingId, setFileLoadingId] = useState<number | null>(null);
+
+  const toggleDocText = (docId: number) => {
+    setExpandedDocText((prev) => ({
+      ...prev,
+      [docId]: !prev[docId],
+    }));
+  };
+
+  const handleViewDocumentFile = async (docId: number) => {
+    if (!id) return;
+    try {
+      setFileLoadingId(docId);
+      const response = await api.get(`/applications/${id}/documents/${docId}/file`, {
+        responseType: "blob",
+      });
+      const contentType = (response.headers["content-type"] as string) || "application/pdf";
+      const blob = new Blob([response.data], { type: contentType });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch (err) {
+      console.error("Failed to view document file:", err);
+      alert("Could not load document file from server. Please verify you have underwriter privileges.");
+    } finally {
+      setFileLoadingId(null);
+    }
+  };
 
   const fetchApplicationDetails = async () => {
     if (!id) return;
@@ -552,65 +603,256 @@ export default function ApplicationReviewPage() {
           </div>
         )}
 
-        {/* Uploaded Documents Review */}
-        <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2 text-blue-400 text-xs font-semibold uppercase tracking-wider">
-              <FileText size={16} />
-              Applicant Uploaded Documents
+        {/* Uploaded Documents & Document Intelligence Review */}
+        <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-2">
+            <div>
+              <div className="flex items-center gap-2 text-blue-400 text-xs font-semibold uppercase tracking-wider">
+                <FileSearch size={16} />
+                Document Intelligence & Consistency Verification
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Automated document text extraction, structured entity parsing, and disclosure consistency checks.
+              </p>
             </div>
-            <span className="text-xs text-slate-400">
-              {application.documents ? application.documents.length : 0} document(s) attached
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-slate-300">
+                {application.documents ? application.documents.length : 0} document(s) attached
+              </span>
+              {(() => {
+                const totalDisc = application.documents?.reduce((acc, d) => acc + (d.discrepancy_count || 0), 0) || 0;
+                if (totalDisc > 0) {
+                  return (
+                    <span className="text-xs bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-lg text-rose-300 font-bold flex items-center gap-1.5">
+                      <AlertTriangle size={14} />
+                      {totalDisc} Discrepancy(ies) Flagged
+                    </span>
+                  );
+                } else if (application.documents && application.documents.length > 0) {
+                  return (
+                    <span className="text-xs bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-emerald-300 font-medium flex items-center gap-1.5">
+                      <CheckCircle2 size={14} />
+                      Zero Discrepancies
+                    </span>
+                  );
+                }
+                return null;
+              })()}
+            </div>
           </div>
 
-          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs flex items-start gap-2">
-            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-            <span>
-              <strong>Manual Document Verification Notice:</strong> Automated OCR and identity verification is pending in this release. All documents are flagged as <strong>UPLOADED_PENDING_REVIEW</strong> and must be examined manually by the underwriter.
-            </span>
-          </div>
+          {/* Underwriter Consistency Status Alert Banner */}
+          {(() => {
+            const totalDisc = application.documents?.reduce((acc, d) => acc + (d.discrepancy_count || 0), 0) || 0;
+            const hasDocs = application.documents && application.documents.length > 0;
 
-          {application.documents && application.documents.length > 0 ? (
-            <div className="border border-slate-800 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-900/80 text-[11px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-800">
-                  <tr>
-                    <th className="px-4 py-3">Document Category</th>
-                    <th className="px-4 py-3">Submitted Filename</th>
-                    <th className="px-4 py-3">File Size</th>
-                    <th className="px-4 py-3">Upload Timestamp</th>
-                    <th className="px-4 py-3">Verification Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 bg-slate-950/30">
-                  {application.documents.map((doc) => (
-                    <tr key={doc.id} className="hover:bg-slate-900/40 transition">
-                      <td className="px-4 py-3.5 font-medium text-white">
-                        {doc.document_type}
-                      </td>
-                      <td className="px-4 py-3.5 font-mono text-slate-300">
-                        {doc.filename}
-                      </td>
-                      <td className="px-4 py-3.5 text-slate-400">
-                        {doc.file_size ? `${(doc.file_size / 1024).toFixed(1)} KB` : "—"}
-                      </td>
-                      <td className="px-4 py-3.5 text-slate-400">
-                        {new Date(doc.uploaded_at).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                          {doc.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="py-8 text-center text-slate-500 text-xs italic">
-              No documents were uploaded with this application.
+            if (totalDisc > 0) {
+              return (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs flex items-start gap-3">
+                  <AlertTriangle size={18} className="shrink-0 mt-0.5 text-rose-400" />
+                  <div>
+                    <strong className="text-sm text-rose-200 block mb-0.5">
+                      Consistency Discrepancy Detected ({totalDisc} flag{totalDisc > 1 ? "s" : ""})
+                    </strong>
+                    <span>
+                      The system identified discrepancies between self-disclosed applicant parameters and data extracted from uploaded documents. Please examine the verification matrices below before entering your underwriting decision.
+                    </span>
+                  </div>
+                </div>
+              );
+            } else if (hasDocs) {
+              return (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 text-xs flex items-start gap-3">
+                  <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-emerald-400" />
+                  <div>
+                    <strong className="text-sm text-emerald-200 block mb-0.5">
+                      Document Disclosures Consistent
+                    </strong>
+                    <span>
+                      All extracted applicant data (Name, Date of Birth/Age, Gender, and Smoking status) aligns with application disclosures without detected contradictions.
+                    </span>
+                  </div>
+                </div>
+              );
+            } else {
+              return (
+                <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl text-slate-400 text-xs flex items-start gap-3">
+                  <Info size={18} className="shrink-0 mt-0.5 text-blue-400" />
+                  <div>
+                    <strong className="text-sm text-slate-300 block mb-0.5">No Documents Attached</strong>
+                    <span>Applicant did not upload verification documents with this policy submission.</span>
+                  </div>
+                </div>
+              );
+            }
+          })()}
+
+          {/* Document Intelligence Cards */}
+          {application.documents && application.documents.length > 0 && (
+            <div className="space-y-4">
+              {application.documents.map((doc) => {
+                const isExpanded = !!expandedDocText[doc.id];
+                const hasChecks = doc.consistency_checks && doc.consistency_checks.length > 0;
+                const hasEntities = doc.structured_data && Object.keys(doc.structured_data).length > 0;
+
+                return (
+                  <div
+                    key={doc.id}
+                    className={`border rounded-xl p-5 transition ${
+                      (doc.discrepancy_count || 0) > 0
+                        ? "bg-rose-950/10 border-rose-500/30"
+                        : "bg-slate-900/40 border-slate-800"
+                    }`}
+                  >
+                    {/* Document Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          <FileText size={20} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-white">{doc.document_type}</h4>
+                            {(doc.discrepancy_count || 0) > 0 ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                                ⚠ {doc.discrepancy_count} Discrepancy
+                              </span>
+                            ) : doc.status === "PROCESSED" ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                ✓ Verified Match
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-slate-400 font-mono mt-0.5">
+                            {doc.filename} • {doc.file_size ? `${(doc.file_size / 1024).toFixed(1)} KB` : "—"} • Uploaded {new Date(doc.uploaded_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {doc.extraction_method && (
+                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                            {doc.extraction_method === "EMBEDDED_PDF_TEXT"
+                              ? "PDF Native Text"
+                              : doc.extraction_method.startsWith("TESSERACT")
+                              ? "Tesseract OCR"
+                              : doc.extraction_method}
+                          </span>
+                        )}
+                        {doc.storage_path && (
+                          <button
+                            onClick={() => handleViewDocumentFile(doc.id)}
+                            disabled={fileLoadingId === doc.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 transition disabled:opacity-50"
+                            title="Open original document in new tab"
+                          >
+                            {fileLoadingId === doc.id ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : (
+                              <ExternalLink size={13} />
+                            )}
+                            View File
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Consistency Checks Matrix */}
+                    {hasChecks && (
+                      <div className="mt-4 space-y-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                          <FileCheck size={14} className="text-blue-400" />
+                          Application Disclosure Cross-Verification
+                        </div>
+                        <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/40">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-900/80 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                              <tr>
+                                <th className="px-3.5 py-2.5">Verification Field</th>
+                                <th className="px-3.5 py-2.5">Application Disclosure</th>
+                                <th className="px-3.5 py-2.5">Extracted from Document</th>
+                                <th className="px-3.5 py-2.5">Status</th>
+                                <th className="px-3.5 py-2.5">Verification Details</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/50">
+                              {doc.consistency_checks!.map((chk, idx) => (
+                                <tr
+                                  key={idx}
+                                  className={chk.status === "MISMATCH" ? "bg-rose-500/5" : "hover:bg-slate-900/30"}
+                                >
+                                  <td className="px-3.5 py-2.5 font-medium text-white">{chk.label}</td>
+                                  <td className="px-3.5 py-2.5 font-mono text-slate-300">{String(chk.application_value ?? "—")}</td>
+                                  <td className="px-3.5 py-2.5 font-mono text-slate-300">{String(chk.document_value ?? "—")}</td>
+                                  <td className="px-3.5 py-2.5">
+                                    {chk.status === "MATCH" ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                        MATCH ✓
+                                      </span>
+                                    ) : chk.status === "MISMATCH" ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+                                        MISMATCH ⚠
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                                        NOT DETECTED
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-3.5 py-2.5 text-slate-400 text-[11px]">{chk.details}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Structured Extracted Fields Grid */}
+                    {hasEntities && (
+                      <div className="mt-4 space-y-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                          Extracted Structured Entities
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                          {Object.entries(doc.structured_data!).map(([key, val]) => (
+                            <div key={key} className="bg-slate-950/60 border border-slate-800 rounded-lg p-2.5">
+                              <span className="text-[10px] uppercase tracking-wider text-slate-500 block truncate">
+                                {key.replace(/_/g, " ")}
+                              </span>
+                              <span className="text-white font-mono font-medium truncate block mt-0.5">
+                                {Array.isArray(val) ? val.join(", ") : String(val)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Extracted Raw Text Drawer */}
+                    {doc.extracted_text && (
+                      <div className="mt-4 pt-3 border-t border-slate-800/60">
+                        <button
+                          type="button"
+                          onClick={() => toggleDocText(doc.id)}
+                          className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition font-medium"
+                        >
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          <span>
+                            {isExpanded ? "Hide" : "View"} Extracted Source Text ({doc.extracted_text.length} chars)
+                          </span>
+                        </button>
+
+                        {isExpanded && (
+                          <pre className="mt-2 text-[11px] font-mono bg-slate-950 text-slate-300 p-3.5 rounded-xl max-h-48 overflow-y-auto border border-slate-800/80 whitespace-pre-wrap leading-relaxed">
+                            {doc.extracted_text}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

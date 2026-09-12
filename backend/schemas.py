@@ -1,4 +1,4 @@
-from typing import Any, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 
@@ -74,13 +74,29 @@ class DocumentMetadataCreate(BaseModel):
     file_size: Optional[int] = None
 
 
+class ConsistencyCheckItem(BaseModel):
+    field: str
+    label: str
+    application_value: Any
+    document_value: Any
+    status: str  # MATCH, MISMATCH, NOT_FOUND
+    details: str
+
+
 class DocumentMetadataResponse(BaseModel):
     id: int
     application_id: int
     document_type: str
     filename: str
     file_size: Optional[int] = None
+    storage_path: Optional[str] = None
+    mime_type: Optional[str] = None
     status: str = "UPLOADED_PENDING_REVIEW"
+    extraction_method: Optional[str] = None
+    extracted_text: Optional[str] = None
+    structured_data: Optional[Dict[str, Any]] = None
+    consistency_checks: List[ConsistencyCheckItem] = []
+    discrepancy_count: int = 0
     uploaded_at: Any
 
     model_config = ConfigDict(from_attributes=True)

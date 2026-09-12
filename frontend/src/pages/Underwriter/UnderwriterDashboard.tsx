@@ -32,6 +32,7 @@ interface DocumentSummary {
   document_type: string;
   filename: string;
   status: string;
+  discrepancy_count?: number;
 }
 
 interface ApplicationItem {
@@ -335,6 +336,7 @@ export default function UnderwriterDashboard() {
                     <th className="px-4 py-3.5">Predicted Premium</th>
                     <th className="px-4 py-3.5">Risk Tier</th>
                     <th className="px-4 py-3.5">Status</th>
+                    <th className="px-4 py-3.5">Doc Intelligence</th>
                     <th className="px-4 py-3.5 text-right">Action</th>
                   </tr>
                 </thead>
@@ -421,6 +423,27 @@ export default function UnderwriterDashboard() {
                           >
                             {app.status}
                           </span>
+                        </td>
+                        <td className="px-4 py-4 text-xs">
+                          {(() => {
+                            const totalDisc = app.documents?.reduce((acc, d) => acc + (d.discrepancy_count || 0), 0) || 0;
+                            const hasDocs = app.documents && app.documents.length > 0;
+                            if (!hasDocs) {
+                              return <span className="text-slate-500 text-[11px] italic">No docs</span>;
+                            }
+                            if (totalDisc > 0) {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/35">
+                                  ⚠ {totalDisc} Discrepancy
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                ✓ Verified
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-4 text-xs text-right">
                           <Link

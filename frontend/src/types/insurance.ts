@@ -49,3 +49,29 @@ export interface DocumentUploadState {
   medical: File | null;
   income: File | null;
 }
+
+export interface ConsistencyCheckItem {
+  field: string;
+  label: string;
+  application_value: string | number | null | undefined;
+  document_value: string | number | null | undefined;
+  status: "MATCH" | "MISMATCH" | "NOT_FOUND";
+  details: string;
+}
+
+export interface DocumentItem {
+  id: number;
+  application_id: number;
+  document_type: string;
+  filename: string;
+  file_size?: number | null;
+  storage_path?: string | null;
+  mime_type?: string | null;
+  status: string;
+  extraction_method?: string | null;
+  extracted_text?: string | null;
+  structured_data?: Record<string, unknown> | null;
+  consistency_checks?: ConsistencyCheckItem[];
+  discrepancy_count?: number;
+  uploaded_at: string;
+}

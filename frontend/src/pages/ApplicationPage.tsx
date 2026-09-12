@@ -132,13 +132,23 @@ export default function ApplicationPage() {
           const f = files[dt.key];
           if (f) {
             try {
-              await api.post(`/applications/${appId}/documents`, {
-                document_type: dt.label,
-                filename: f.name,
-                file_size: f.size,
+              const form = new FormData();
+              form.append("file", f);
+              form.append("document_type", dt.label);
+              await api.post(`/applications/${appId}/documents/upload`, form, {
+                headers: { "Content-Type": "multipart/form-data" },
               });
-            } catch (docErr) {
-              console.warn("Could not save document metadata:", docErr);
+            } catch (uploadErr) {
+              console.warn(`Multipart upload failed for ${dt.label}, attempting metadata fallback:`, uploadErr);
+              try {
+                await api.post(`/applications/${appId}/documents`, {
+                  document_type: dt.label,
+                  filename: f.name,
+                  file_size: f.size,
+                });
+              } catch (docErr) {
+                console.warn("Could not save document metadata fallback:", docErr);
+              }
             }
           }
         }

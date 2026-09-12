@@ -78,7 +78,32 @@ def get_db():
 
 
 def init_db():
-    """Initializes tables in the connected database."""
+    """Initializes tables and migrates any missing columns in the connected database."""
     import db_models  # noqa: F401
     Base.metadata.create_all(bind=engine)
+
+    # Auto-migration: check for newly added columns in documents table
+    from sqlalchemy import inspect, text
+    try:
+        inspector = inspect(engine)
+        existing_cols = {col["name"] for col in inspector.get_columns("documents")}
+        
+        new_cols = [
+            ("storage_path", "VARCHAR(500)"),
+            ("mime_type", "VARCHAR(100)"),
+            ("extracted_text", "TEXT"),
+            ("extraction_method", "VARCHAR(50)"),
+            ("structured_data_json", "TEXT"),
+            ("consistency_checks_json", "TEXT"),
+            ("discrepancy_count", "INTEGER DEFAULT 0"),
+        ]
+
+        with engine.begin() as conn:
+            for col_name, col_type in new_cols:
+                if col_name not in existing_cols:
+                    logger.info(f"Migrating schema: adding column '{col_name}' to 'documents' table.")
+                    conn.execute(text(f"ALTER TABLE documents ADD COLUMN {col_name} {col_type}"))
+    except Exception as exc:
+        logger.warning(f"Schema auto-migration check notice: {exc}")
+
     logger.info("Database schema initialized successfully.")
