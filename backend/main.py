@@ -907,11 +907,15 @@ def get_premium_trends(
 def download_underwriting_report(
     application_id: int,
     db: Session = Depends(get_db),
-    current_user: db_models.User = Depends(require_underwriter),
+    current_user: db_models.User = Depends(get_current_user),
 ):
     """
     Generates and downloads a comprehensive, multi-page PDF Underwriting Assessment Report.
-    Strictly restricted to UNDERWRITER role. Customers receive 403 Forbidden.
+    Access Control:
+    - UNDERWRITER role: Permitted to download report for any application.
+    - CUSTOMER role: Permitted to download report ONLY for applications they own.
+    - Other customers: 403 Forbidden.
+    - Unauthenticated: 401 Unauthorized.
     Non-mutating: does not alter application status or database records.
     """
     application = db.query(db_models.Application).filter(db_models.Application.id == application_id).first()
@@ -919,6 +923,13 @@ def download_underwriting_report(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Application #{application_id} not found."
+        )
+
+    # RBAC & Ownership Enforcement
+    if current_user.role.upper() != "UNDERWRITER" and application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Underwriter access or application ownership required."
         )
 
     latest_pred = application.predictions[0] if application.predictions else None

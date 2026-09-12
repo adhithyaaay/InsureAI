@@ -26,6 +26,7 @@ import {
   FileDown,
 } from "lucide-react";
 import api from "../../services/api";
+import { downloadUnderwritingReport } from "../../services/reportService";
 import type { UnderwritingSummaryResponse } from "../../types/insurance";
 
 interface FeatureImpact {
@@ -224,18 +225,7 @@ export default function ApplicationReviewPage() {
     if (!id) return;
     try {
       setDownloadingReport(true);
-      const response = await api.get(`/applications/${id}/underwriting-report`, {
-        responseType: "blob",
-      });
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `underwriting_report_${id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode?.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      await downloadUnderwritingReport(id);
     } catch (err) {
       console.error("Failed to download underwriting report:", err);
       alert("Failed to download underwriting report. Please try again.");

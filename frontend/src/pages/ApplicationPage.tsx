@@ -38,6 +38,7 @@ export default function ApplicationPage() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const [applicationId, setApplicationId] = useState<number | null>(null);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -119,6 +120,7 @@ export default function ApplicationPage() {
         // 1. Create Application record in database
         const appRes = await api.post<{ id: number }>("/applications", payload);
         const appId = appRes.data.id;
+        setApplicationId(appId);
 
         // 2. Persist uploaded document metadata
         const docTypes: { key: string; label: string }[] = [
@@ -206,6 +208,7 @@ export default function ApplicationPage() {
     setErrors({});
     setApiError(null);
     setPrediction(null);
+    setApplicationId(null);
     setStep(1);
   };
 
@@ -328,6 +331,7 @@ export default function ApplicationPage() {
         <div className="max-w-4xl mx-auto">
           <DecisionCard
             prediction={prediction}
+            applicationId={applicationId ?? prediction?.application_id ?? null}
             formData={formData}
             onReset={handleReset}
             loading={loading}

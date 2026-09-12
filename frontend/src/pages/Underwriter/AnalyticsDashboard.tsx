@@ -135,7 +135,7 @@ export default function AnalyticsDashboard() {
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-bold text-white">Underwriter Analytics</h1>
                 <span className="text-[10px] uppercase tracking-wider font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded-full">
-                  Portfolio Intelligence
+                  Database-backed Analytics
                 </span>
               </div>
               <p className="text-xs text-slate-400">

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ShieldCheck,
   IndianRupee,
@@ -11,12 +12,15 @@ import {
   TrendingDown,
   Info,
   BarChart3,
+  Loader2,
 } from "lucide-react";
 
 import type { InsuranceFormData, PredictionResult } from "@/types/insurance";
+import { downloadUnderwritingReport } from "@/services/reportService";
 
 interface Props {
   prediction: PredictionResult | null;
+  applicationId?: number | null;
   formData?: InsuranceFormData;
   onReset?: () => void;
   loading?: boolean;
@@ -24,10 +28,42 @@ interface Props {
 
 export default function DecisionCard({
   prediction,
+  applicationId,
   formData,
   onReset,
   loading = false,
 }: Props) {
+  const [downloadingReport, setDownloadingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+
+  // Exact application ID verification (NEVER fallback to prediction.id)
+  const resolvedApplicationId = applicationId ?? prediction?.application_id ?? null;
+
+  const handleDownloadReport = async () => {
+    setReportError(null);
+
+    if (!resolvedApplicationId) {
+      setReportError("Application ID is unavailable. Please open the application review page to download the report.");
+      return;
+    }
+
+    try {
+      setDownloadingReport(true);
+      await downloadUnderwritingReport(resolvedApplicationId);
+    } catch (err: unknown) {
+      console.error("Failed to download underwriting report:", err);
+      let errorMsg = "Failed to download underwriting report. Please try again.";
+      if (err && typeof err === "object" && "response" in err) {
+        const responseData = (err as { response?: { data?: { detail?: string } } }).response?.data;
+        if (responseData?.detail) {
+          errorMsg = responseData.detail;
+        }
+      }
+      setReportError(errorMsg);
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-12 text-center border border-slate-200">
@@ -104,9 +140,9 @@ export default function DecisionCard({
             <Brain size={14} />
             XGBoost Risk Assessment v{prediction.model_version || "2.0"}
           </div>
-          {prediction.application_id && (
+          {resolvedApplicationId && (
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-300 font-mono">
-              <span>App Ref: #APP-{String(prediction.application_id).padStart(5, "0")}</span>
+              <span>App Ref: #APP-{String(resolvedApplicationId).padStart(5, "0")}</span>
             </div>
           )}
         </div>
@@ -114,7 +150,7 @@ export default function DecisionCard({
           AI Underwriting Decision
         </h1>
         <p className="mt-1 text-slate-500 text-sm">
-          Calculated using real-time machine learning prediction on applicant risk factors
+          Calculated using trained XGBoost machine learning prediction on applicant risk factors
         </p>
       </div>
 
@@ -368,26 +404,36 @@ export default function DecisionCard({
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap justify-center gap-4 mt-8 pt-6 border-t border-slate-100">
-        <button
-          type="button"
-          onClick={() => alert("Report generation with full underwriting breakdown will be available in Phase 8.")}
-          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm"
-        >
-          <Download size={16} />
-          Download Underwriting Report
-        </button>
+      <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center">
+        {reportError && (
+          <div className="w-full max-w-md mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-center gap-2">
+            <AlertTriangle size={15} className="shrink-0 text-rose-600" />
+            <span>{reportError}</span>
+          </div>
+        )}
 
-        {onReset && (
+        <div className="flex flex-wrap justify-center gap-4">
           <button
             type="button"
-            onClick={onReset}
-            className="flex items-center gap-2 border border-slate-300 bg-white text-slate-700 px-6 py-2.5 rounded-lg hover:bg-slate-50 transition text-sm font-medium shadow-sm"
+            onClick={handleDownloadReport}
+            disabled={downloadingReport}
+            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm disabled:opacity-50"
           >
-            <RotateCcw size={16} />
-            Start New Application
+            {downloadingReport ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            {downloadingReport ? "Downloading Report..." : "Download Underwriting Report"}
           </button>
-        )}
+
+          {onReset && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="flex items-center gap-2 border border-slate-300 bg-white text-slate-700 px-6 py-2.5 rounded-lg hover:bg-slate-50 transition text-sm font-medium shadow-sm"
+            >
+              <RotateCcw size={16} />
+              Start New Application
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

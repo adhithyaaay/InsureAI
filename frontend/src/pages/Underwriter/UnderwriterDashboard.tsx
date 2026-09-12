@@ -173,10 +173,11 @@ export default function UnderwriterDashboard() {
           <div className="flex items-center gap-3">
             <Link
               to="/underwriter/analytics"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-medium transition"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 border border-indigo-500/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              title="Open Database-backed Portfolio Analytics Dashboard"
             >
-              <BarChart3 size={14} />
-              Analytics Dashboard
+              <BarChart3 size={15} />
+              <span>Analytics Dashboard</span>
             </Link>
 
             <button
@@ -246,6 +247,26 @@ export default function UnderwriterDashboard() {
             <p className="text-2xl sm:text-3xl font-extrabold text-purple-400 mt-2">{metrics.highRisk}</p>
             <p className="text-[11px] text-slate-500 mt-1">Substandard / surcharge</p>
           </div>
+        </div>
+
+        {/* Database-backed Analytics Quick Link Banner */}
+        <div className="bg-gradient-to-r from-indigo-950/60 via-slate-900 to-blue-950/50 border border-indigo-900/40 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+              <BarChart3 size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-white">Database-backed Portfolio Analytics</h3>
+              <p className="text-xs text-slate-400">View monthly inflows, ML risk distributions, average premium trends, and operational KPIs.</p>
+            </div>
+          </div>
+          <Link
+            to="/underwriter/analytics"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/25 transition shrink-0"
+          >
+            <span>Open Analytics</span>
+            <ArrowRight size={14} />
+          </Link>
         </div>
 
         {/* Search & Filter Controls */}
