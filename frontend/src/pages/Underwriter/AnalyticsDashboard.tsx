@@ -29,8 +29,11 @@ import {
   Loader2,
   TrendingUp,
   Percent,
+  Layers,
+  Info,
 } from "lucide-react";
 import api from "../../services/api";
+
 import { useAuth } from "../../context/AuthContext";
 
 interface DashboardKPIs {
@@ -448,7 +451,87 @@ export default function AnalyticsDashboard() {
               </div>
             </div>
 
+            {/* Coverage Mix — Prototype (Phase 10) */}
+            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                    <Layers size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold text-white">Coverage Mix — Prototype</h2>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-teal-500/15 text-teal-300 border border-teal-500/30">
+                        Product Catalog
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Configured health coverage products available for underwriting recommendations
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Prototype Catalog Products Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1">
+                    <span className="font-bold text-teal-400">BASIC_5L</span>
+                    <span>1 Year Term</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-white mb-1">Basic Health Plan</h4>
+                  <div className="text-xl font-bold text-white mb-2">₹ 5,00,000</div>
+                  <p className="text-xs text-slate-400 mb-2">
+                    Essential healthcare protection designed for individual baseline medical coverage.
+                  </p>
+                  <div className="text-[11px] font-mono text-slate-500 border-t border-slate-800 pt-2">
+                    Benchmark Multiplier: <strong className="text-slate-300">0.85x</strong>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1">
+                    <span className="font-bold text-teal-400">STANDARD_10L</span>
+                    <span>1 Year Term</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-white mb-1">Standard Health Plan</h4>
+                  <div className="text-xl font-bold text-white mb-2">₹ 10,00,000</div>
+                  <p className="text-xs text-slate-400 mb-2">
+                    Comprehensive health coverage balancing balanced financial protection and routine hospitalisation coverage.
+                  </p>
+                  <div className="text-[11px] font-mono text-slate-500 border-t border-slate-800 pt-2">
+                    Benchmark Multiplier: <strong className="text-slate-300">1.00x (Standard)</strong>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1">
+                    <span className="font-bold text-teal-400">PREMIUM_20L</span>
+                    <span>1 Year Term</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-white mb-1">Premium Health Plan</h4>
+                  <div className="text-xl font-bold text-white mb-2">₹ 20,00,000</div>
+                  <p className="text-xs text-slate-400 mb-2">
+                    Extensive health coverage designed for comprehensive family protection and critical medical security.
+                  </p>
+                  <div className="text-[11px] font-mono text-slate-500 border-t border-slate-800 pt-2">
+                    Benchmark Multiplier: <strong className="text-slate-300">1.35x</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Explicit Persistence Disclosure */}
+              <div className="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800 text-xs text-slate-400 flex items-center gap-2.5">
+                <Info size={16} className="text-blue-400 shrink-0" />
+                <span>
+                  <strong>Data Integrity Disclosure:</strong> Coverage selection analytics will be available once policy selections are persisted.
+                  Currently displaying the active prototype product catalog without fabricated historical figures.
+                </span>
+              </div>
+            </div>
+
             {/* Governance Callout */}
+
             <div className="p-4 rounded-2xl bg-slate-950/40 border border-slate-800/80 text-xs text-slate-400 flex items-start gap-3">
               <ShieldAlert size={18} className="text-indigo-400 shrink-0 mt-0.5" />
               <div>

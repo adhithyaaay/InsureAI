@@ -39,6 +39,8 @@ from schemas import (
     RiskDistributionResponse,
     MonthlyApplicationItem,
     PremiumTrendItem,
+    CoverageOption,
+    CoverageRecommendationResponse,
 )
 from predictor import predict_and_explain
 from document_storage import (
@@ -53,6 +55,8 @@ from underwriting_rules import evaluate_all_underwriting_indicators
 from underwriting_summary import build_underwriting_summary, calculate_review_priority
 import analytics_service
 from report_generator import generate_underwriting_report_pdf
+import coverage_service
+
 
 
 logger = logging.getLogger("insureai.api")
@@ -951,3 +955,54 @@ def download_underwriting_report(
             "Content-Type": "application/pdf",
         },
     )
+
+
+# ==============================================================================
+# COVERAGE & POLICY RECOMMENDATION ENDPOINTS (Phase 10)
+# ==============================================================================
+@app.get(
+    "/applications/{application_id}/coverage-options",
+    response_model=CoverageRecommendationResponse,
+)
+def get_application_coverage_options(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user),
+):
+    """
+    Retrieves deterministic prototype coverage options and indicative pricing recommendations.
+    Access Control:
+    - UNDERWRITER role: Authorized to view coverage options for any application.
+    - CUSTOMER role: Authorized ONLY for applications owned by the authenticated customer.
+    - Other customers: 403 Forbidden.
+    - Unauthenticated: 401 Unauthorized.
+    Non-mutating: Does not alter application status or create underwriter decisions.
+    """
+    application = db.query(db_models.Application).filter(db_models.Application.id == application_id).first()
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Application #{application_id} not found."
+        )
+
+    # RBAC & Ownership Enforcement
+    if current_user.role.upper() != "UNDERWRITER" and application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Underwriter access or application ownership required."
+        )
+
+    latest_pred = application.predictions[0] if application.predictions else None
+    if not latest_pred:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Prediction not found for Application #{application_id}. Please generate a prediction first."
+        )
+
+    coverage_data = coverage_service.generate_coverage_recommendation(
+        application=application,
+        prediction=latest_pred,
+        db=db,
+    )
+
+    return CoverageRecommendationResponse(**coverage_data)

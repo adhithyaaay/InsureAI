@@ -133,3 +133,28 @@ export interface UnderwritingSummaryResponse {
   human_in_the_loop_disclaimer?: string;
   generated_at: string;
 }
+
+export interface CoverageOption {
+  product_code: string;
+  product_name: string;
+  coverage_amount: number;
+  coverage_display: string;
+  policy_period_years: number;
+  base_predicted_premium: number;
+  indicative_premium: number;
+  pricing_note: string;
+}
+
+export interface CoverageRecommendationResponse {
+  application_id?: number | null;
+  base_predicted_premium: number;
+  currency: string;
+  coverage_options: CoverageOption[];
+  suggested_product_code?: string | null;
+  suggested_product_name?: string | null;
+  recommendation_reason: string;
+  review_priority: string;
+  risk_tier: string;
+  human_in_the_loop_disclaimer: string;
+  pricing_disclaimer: string;
+}

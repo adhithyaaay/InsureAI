@@ -24,10 +24,13 @@ import {
   FileSearch,
   ShieldAlert,
   FileDown,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 import api from "../../services/api";
 import { downloadUnderwritingReport } from "../../services/reportService";
-import type { UnderwritingSummaryResponse } from "../../types/insurance";
+import type { UnderwritingSummaryResponse, CoverageRecommendationResponse } from "../../types/insurance";
+
 
 interface FeatureImpact {
   feature: string;
@@ -108,6 +111,7 @@ export default function ApplicationReviewPage() {
 
   const [application, setApplication] = useState<ApplicationDetails | null>(null);
   const [underwritingSummary, setUnderwritingSummary] = useState<UnderwritingSummaryResponse | null>(null);
+  const [coverageRecommendation, setCoverageRecommendation] = useState<CoverageRecommendationResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,9 +160,10 @@ export default function ApplicationReviewPage() {
     try {
       setLoading(true);
       setError(null);
-      const [appRes, summaryRes] = await Promise.allSettled([
+      const [appRes, summaryRes, coverageRes] = await Promise.allSettled([
         api.get<ApplicationDetails>(`/applications/${id}`),
         api.get<UnderwritingSummaryResponse>(`/applications/${id}/underwriting-summary`),
+        api.get<CoverageRecommendationResponse>(`/applications/${id}/coverage-options`),
       ]);
 
       if (appRes.status === "fulfilled") {
@@ -172,9 +177,16 @@ export default function ApplicationReviewPage() {
       } else {
         setUnderwritingSummary(null);
       }
+
+      if (coverageRes.status === "fulfilled") {
+        setCoverageRecommendation(coverageRes.value.data);
+      } else {
+        setCoverageRecommendation(null);
+      }
     } catch (err: unknown) {
       console.error("Failed to load application review:", err);
       setError("Unable to load application details. Verify ID exists and you are authenticated as an Underwriter.");
+
     } finally {
       setLoading(false);
     }
@@ -1154,8 +1166,135 @@ export default function ApplicationReviewPage() {
           </div>
         )}
 
+        {/* Coverage & Policy Recommendation (Phase 10 Prototype) */}
+        {coverageRecommendation && (
+          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 text-teal-400 border border-teal-500/30">
+                  <Layers size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white">Coverage & Policy Recommendation</h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-teal-500/15 text-teal-300 border border-teal-500/30">
+                      Prototype Decision Support
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Indicative plan tiers computed deterministically from applicant risk profile & XGBoost v2.0 prediction
+                  </p>
+                </div>
+              </div>
+
+              {/* Badges: Risk Tier & Review Priority */}
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-lg text-xs font-mono font-semibold bg-slate-900 text-slate-300 border border-slate-700">
+                  Risk Tier: <strong className="text-white">{coverageRecommendation.risk_tier}</strong>
+                </span>
+                <span className={`px-3 py-1 rounded-lg text-xs font-mono font-semibold border ${
+                  coverageRecommendation.review_priority === "CRITICAL"
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                    : coverageRecommendation.review_priority === "HIGH"
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                    : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                }`}>
+                  Priority: <strong>{coverageRecommendation.review_priority}</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Coverage Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {coverageRecommendation.coverage_options.map((opt) => {
+                const isSuggested = opt.product_code === coverageRecommendation.suggested_product_code;
+                return (
+                  <div
+                    key={opt.product_code}
+                    className={`rounded-xl p-5 transition flex flex-col justify-between relative ${
+                      isSuggested
+                        ? "bg-gradient-to-b from-teal-950/40 to-slate-900/90 border-2 border-teal-500/80 shadow-lg shadow-teal-950/40"
+                        : "bg-slate-900/60 border border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    {isSuggested && (
+                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                        <span className="bg-teal-500 text-slate-950 text-[10px] font-black uppercase tracking-wider px-3 py-0.5 rounded-full shadow-md flex items-center gap-1">
+                          <Sparkles size={11} />
+                          Suggested for Review
+                        </span>
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                          {opt.product_code}
+                        </span>
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                          {opt.policy_period_years} Year Term
+                        </span>
+                      </div>
+                      <h4 className="text-base font-bold text-white mb-3">{opt.product_name}</h4>
+                      <div className="mb-4">
+                        <span className="text-2xl font-black text-white">{opt.coverage_display}</span>
+                        <span className="text-[11px] text-slate-400 block">Sum Insured</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-800/80">
+                      <span className="text-[11px] text-slate-400 block">Indicative Annual Premium</span>
+                      <div className="text-xl font-bold text-white mt-0.5 font-mono">
+                        ₹ {Math.round(opt.indicative_premium).toLocaleString("en-IN")}
+                        <span className="text-xs font-normal text-slate-500"> / yr</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1 block">
+                        {opt.pricing_note}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Recommendation Reason Callout */}
+            <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Info size={14} className="text-teal-400" />
+                Recommendation Rationale & Underwriter Context
+              </div>
+              <p className="text-xs text-slate-200 leading-relaxed">
+                {coverageRecommendation.recommendation_reason}
+              </p>
+              <div className="mt-2 text-[11px] text-slate-400">
+                <span>Base Persisted Prediction: </span>
+                <strong className="text-white font-mono">
+                  ₹ {Math.round(coverageRecommendation.base_predicted_premium).toLocaleString("en-IN")}
+                </strong>
+                <span className="ml-3 text-slate-500">
+                  ({coverageRecommendation.pricing_disclaimer})
+                </span>
+              </div>
+            </div>
+
+            {/* Prominent Governance Notice */}
+            <div className="flex items-start gap-3 bg-amber-950/20 border border-amber-500/30 rounded-xl p-4 text-xs text-amber-200">
+              <ShieldAlert size={18} className="text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <strong className="text-amber-300 block font-semibold">
+                  Important Governance Notice
+                </strong>
+                <p className="text-slate-300 leading-relaxed">
+                  {coverageRecommendation.human_in_the_loop_disclaimer}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Underwriter Decision Panel & Audit History */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
           {/* Decision Form (7 cols) */}
           <div className="lg:col-span-7 bg-slate-950/60 border border-slate-800 rounded-2xl p-6 shadow-xl">
             <div className="flex items-center gap-2 text-purple-400 text-xs font-semibold uppercase tracking-wider pb-3 border-b border-slate-800 mb-4">

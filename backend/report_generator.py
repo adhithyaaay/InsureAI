@@ -19,6 +19,9 @@ from reportlab.platypus import (
 from reportlab.pdfgen import canvas
 
 from underwriting_summary import build_underwriting_summary
+from coverage_service import generate_coverage_recommendation
+from policy_products import PRICING_DISCLAIMER
+
 
 
 def mask_identifier(val: Any, id_type: str = "") -> str:
@@ -529,9 +532,94 @@ def generate_underwriting_report_pdf(
     story.append(Spacer(1, 10))
 
     # =========================================================================
+    # 6. COVERAGE & POLICY RECOMMENDATION (PROTOTYPE)
+    # =========================================================================
+    story.append(Paragraph("6. Coverage & Policy Recommendation (Prototype)", section_heading))
+
+    if prediction:
+        cov_rec = generate_coverage_recommendation(
+            application=application,
+            prediction=prediction,
+        )
+        cov_options = cov_rec.get("coverage_options", [])
+        suggested_code = cov_rec.get("suggested_product_code", "STANDARD_10L")
+        suggested_name = cov_rec.get("suggested_product_name", "Standard Health Plan")
+        rec_reason = cov_rec.get("recommendation_reason", "Underwriting review recommended.")
+
+        cov_rows = [
+            [
+                Paragraph("Product Code & Name", table_header_style),
+                Paragraph("Sum Insured", table_header_style),
+                Paragraph("Policy Term", table_header_style),
+                Paragraph("Multiplier", table_header_style),
+                Paragraph("Indicative Premium", table_header_style),
+                Paragraph("Recommendation", table_header_style),
+            ]
+        ]
+        for opt in cov_options:
+            is_suggested = opt["product_code"] == suggested_code
+            status_text = (
+                "<font color='#0D9488'><b>Suggested for Review</b></font>"
+                if is_suggested
+                else "<font color='#64748B'>Available Option</font>"
+            )
+            multiplier_val = f"{opt['indicative_premium'] / opt['base_predicted_premium']:.2f}x" if opt.get("base_predicted_premium") else "1.00x"
+            cov_rows.append([
+                Paragraph(f"<b>{opt['product_name']}</b><br/><font color='#64748B'>{opt['product_code']}</font>", table_cell_style),
+                Paragraph(f"<b>{opt['coverage_display']}</b>", table_cell_style),
+                Paragraph(f"{opt['policy_period_years']} Year", table_cell_style),
+                Paragraph(multiplier_val, table_cell_style),
+                Paragraph(f"<b>₹{opt['indicative_premium']:,.2f}</b>", table_cell_style),
+                Paragraph(status_text, table_cell_style),
+            ])
+
+        cov_table = Table(cov_rows, colWidths=[140, 75, 60, 55, 95, 115])
+        cov_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), secondary_color),
+            ("BOX", (0, 0), (-1, -1), 0.5, border_color),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, border_color),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(cov_table)
+        story.append(Spacer(1, 6))
+
+        # Suggested plan highlight callout box
+        suggested_box = [
+            [
+                Paragraph(
+                    f"<b>Suggested for Underwriter Review:</b> {suggested_name} ({suggested_code})<br/>"
+                    f"<b>Indicative Benchmark Premium:</b> ₹{next((o['indicative_premium'] for o in cov_options if o['product_code'] == suggested_code), 0.0):,.2f}<br/>"
+                    f"<b>Recommendation Rationale:</b> {rec_reason}<br/>"
+                    f"<font color='#64748B'><i>Note: {cov_rec.get('pricing_disclaimer', PRICING_DISCLAIMER)}</i></font>",
+                    body_style
+                )
+            ]
+        ]
+        sug_table = Table(suggested_box, colWidths=[540])
+        sug_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F0FDFA")),  # Teal 50
+            ("BOX", (0, 0), (-1, -1), 0.75, colors.HexColor("#0D9488")),    # Teal 600
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        story.append(sug_table)
+    else:
+        story.append(Paragraph("<i>No ML premium assessment available to compute coverage options.</i>", body_style))
+
+    story.append(Spacer(1, 10))
+
+    # =========================================================================
     # 7. UNDERWRITER DECISION AUDIT TRAIL
     # =========================================================================
-    story.append(Paragraph("6. Underwriter Decision Audit Trail", section_heading))
+    story.append(Paragraph("7. Underwriter Decision Audit Trail", section_heading))
+
 
     if decisions_list:
         dec_rows = [

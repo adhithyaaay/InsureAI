@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ShieldCheck,
   IndianRupee,
@@ -13,9 +13,12 @@ import {
   Info,
   BarChart3,
   Loader2,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 
-import type { InsuranceFormData, PredictionResult } from "@/types/insurance";
+import api from "@/services/api";
+import type { InsuranceFormData, PredictionResult, CoverageRecommendationResponse } from "@/types/insurance";
 import { downloadUnderwritingReport } from "@/services/reportService";
 
 interface Props {
@@ -23,6 +26,7 @@ interface Props {
   applicationId?: number | null;
   formData?: InsuranceFormData;
   onReset?: () => void;
+
   loading?: boolean;
 }
 
@@ -35,9 +39,37 @@ export default function DecisionCard({
 }: Props) {
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [coverageData, setCoverageData] = useState<CoverageRecommendationResponse | null>(null);
+  const [coverageLoading, setCoverageLoading] = useState(false);
 
   // Exact application ID verification (NEVER fallback to prediction.id)
   const resolvedApplicationId = applicationId ?? prediction?.application_id ?? null;
+
+  useEffect(() => {
+    if (!resolvedApplicationId) return;
+    let isMounted = true;
+    setCoverageLoading(true);
+    api
+      .get<CoverageRecommendationResponse>(`/applications/${resolvedApplicationId}/coverage-options`)
+      .then((res) => {
+        if (isMounted) {
+          setCoverageData(res.data);
+        }
+      })
+      .catch((err) => {
+        // Fallback gracefully to dynamic calculation if endpoint is pending or unauthenticated
+        console.warn("Could not fetch coverage options from API:", err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setCoverageLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [resolvedApplicationId]);
+
 
   const handleDownloadReport = async () => {
     setReportError(null);
@@ -403,7 +435,150 @@ export default function DecisionCard({
         </div>
       </div>
 
+      {/* Coverage Options (Phase 10 Prototype) */}
+      <div className="mt-8 border border-slate-200 rounded-2xl p-6 bg-slate-50/50">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-200">
+          <div>
+            <div className="flex items-center gap-2">
+              <Layers className="text-blue-600" size={22} />
+              <h3 className="text-lg font-bold text-slate-900">
+                Coverage Options
+              </h3>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                <Sparkles size={12} />
+                Prototype Indicative Pricing
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Indicative health policy options calculated from the XGBoost v2.0 baseline prediction using configurable demonstration multipliers.
+            </p>
+          </div>
+          {coverageLoading && (
+            <div className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+              <Loader2 size={14} className="animate-spin" />
+              <span>Loading options...</span>
+            </div>
+          )}
+        </div>
+
+        {/* 3 Prototype Coverage Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {(coverageData?.coverage_options || [
+            {
+              product_code: "BASIC_5L",
+              product_name: "Basic Health Plan",
+              coverage_amount: 500000,
+              coverage_display: "₹5,00,000",
+              policy_period_years: 1,
+              base_predicted_premium: prediction.predicted_charge,
+              indicative_premium: Math.round(prediction.predicted_charge * 0.85),
+              pricing_note: "0.85x base model prediction",
+            },
+            {
+              product_code: "STANDARD_10L",
+              product_name: "Standard Health Plan",
+              coverage_amount: 1000000,
+              coverage_display: "₹10,00,000",
+              policy_period_years: 1,
+              base_predicted_premium: prediction.predicted_charge,
+              indicative_premium: Math.round(prediction.predicted_charge * 1.00),
+              pricing_note: "1.00x base model prediction (Standard benchmark)",
+            },
+            {
+              product_code: "PREMIUM_20L",
+              product_name: "Premium Health Plan",
+              coverage_amount: 2000000,
+              coverage_display: "₹20,00,000",
+              policy_period_years: 1,
+              base_predicted_premium: prediction.predicted_charge,
+              indicative_premium: Math.round(prediction.predicted_charge * 1.35),
+              pricing_note: "1.35x base model prediction",
+            },
+          ]).map((opt) => {
+            const isSuggested = opt.product_code === (coverageData?.suggested_product_code || "STANDARD_10L");
+            return (
+              <div
+                key={opt.product_code}
+                className={`bg-white rounded-xl p-5 transition flex flex-col justify-between relative ${
+                  isSuggested
+                    ? "border-2 border-blue-600 shadow-md"
+                    : "border border-slate-200 shadow-sm hover:border-slate-300"
+                }`}
+              >
+                {isSuggested && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-blue-600 text-white text-[10px] font-extrabold uppercase tracking-wider px-3 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+                      <Sparkles size={11} />
+                      Suggested for Review
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <div className={`flex items-center justify-between mb-2 ${isSuggested ? "mt-1" : ""}`}>
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${isSuggested ? "text-blue-600" : "text-slate-500"}`}>
+                      {opt.product_code}
+                    </span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                      isSuggested
+                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                        : "bg-slate-100 text-slate-700 border-slate-200"
+                    }`}>
+                      {opt.policy_period_years} Year Term
+                    </span>
+                  </div>
+                  <h4 className="text-base font-bold text-slate-900">{opt.product_name}</h4>
+                  <div className="mt-3 mb-4">
+                    <span className={`text-2xl font-black ${isSuggested ? "text-blue-700" : "text-slate-900"}`}>
+                      {opt.coverage_display}
+                    </span>
+                    <span className="text-xs text-slate-500 block">Sum Insured</span>
+                  </div>
+                  <p className="text-xs text-slate-600 mb-4">
+                    {opt.product_code === "BASIC_5L"
+                      ? "Essential healthcare protection designed for individual baseline medical coverage."
+                      : opt.product_code === "STANDARD_10L"
+                      ? "Comprehensive health coverage balancing balanced financial protection and routine hospitalisation coverage."
+                      : "Extensive health coverage designed for comprehensive family protection and critical medical security."}
+                  </p>
+                </div>
+
+                <div className={`pt-3 border-t ${
+                  isSuggested
+                    ? "border-slate-100 bg-blue-50/50 -mx-5 -mb-5 p-5 rounded-b-lg"
+                    : "border-slate-100"
+                }`}>
+                  <span className={`text-[11px] block ${isSuggested ? "text-blue-800 font-medium" : "text-slate-500"}`}>
+                    Indicative Annual Premium
+                  </span>
+                  <div className={`text-xl font-bold mt-0.5 ${isSuggested ? "text-blue-900" : "text-slate-900"}`}>
+                    ₹ {Math.round(opt.indicative_premium).toLocaleString("en-IN")}
+                    <span className={`text-xs font-normal ${isSuggested ? "text-blue-600" : "text-slate-400"}`}> / yr</span>
+                  </div>
+                  <span className={`text-[10px] mt-1 block ${isSuggested ? "text-blue-600/80" : "text-slate-400"}`}>
+                    {opt.pricing_note}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+
+        {/* Prototype Pricing & Governance Disclaimer */}
+        <div className="mt-5 flex items-start gap-2 text-[11px] text-slate-500 bg-white p-3 rounded-xl border border-slate-200">
+          <Info size={15} className="text-amber-600 shrink-0 mt-0.5" />
+          <span>
+            <strong>Prototype Pricing Notice:</strong> Indicative prototype pricing — not an insurer quote.
+            Coverage options and indicative premiums are decision-support estimates generated for demonstration
+            purposes based on configurable multipliers applied to the XGBoost v2.0 baseline prediction.
+            Final coverage, premium, eligibility, exclusions, and policy binding must be determined by the insurer
+            and authorized human underwriter.
+          </span>
+        </div>
+      </div>
+
       {/* Actions */}
+
       <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center">
         {reportError && (
           <div className="w-full max-w-md mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-center gap-2">

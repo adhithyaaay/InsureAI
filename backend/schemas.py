@@ -246,3 +246,35 @@ class MonthlyApplicationItem(BaseModel):
 class PremiumTrendItem(BaseModel):
     month: str
     average_premium: float
+
+
+# ==============================================================================
+# COVERAGE & POLICY RECOMMENDATION SCHEMAS (Phase 10)
+# ==============================================================================
+class CoverageOption(BaseModel):
+    product_code: str
+    product_name: str
+    coverage_amount: float
+    coverage_display: str
+    policy_period_years: int
+    base_predicted_premium: float
+    indicative_premium: float
+    pricing_note: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CoverageRecommendationResponse(BaseModel):
+    application_id: Optional[int] = None
+    base_predicted_premium: float
+    currency: str = "INR"
+    coverage_options: List[CoverageOption]
+    suggested_product_code: Optional[str] = None
+    suggested_product_name: Optional[str] = None
+    recommendation_reason: str
+    review_priority: str
+    risk_tier: str
+    human_in_the_loop_disclaimer: str
+    pricing_disclaimer: str
+
+    model_config = ConfigDict(from_attributes=True)
